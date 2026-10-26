@@ -302,7 +302,7 @@ body.cat .links a[href="#works"]{color:var(--fg)}
 @media (max-width:420px){.logo b{font-size:15px;letter-spacing:.26em}.logo small{font-size:6.5px;letter-spacing:.5em}}
 
 /* why: pull-back scene, text rides the light beam */
-.why{position:relative;height:440vh;height:440svh}
+.why{position:relative;height:540vh;height:540svh}
 .why-intro{position:absolute;top:128vh;left:0;right:0;display:grid;justify-items:center;gap:22px;text-align:center}
 .why-intro .tag{font-family:'Michroma',var(--display);font-size:11px;letter-spacing:.5em;margin-right:-.5em}
 .why-h{display:grid;font-size:clamp(32px,min(6.6vw,11vh),96px);line-height:.94;letter-spacing:-.035em;text-transform:uppercase;font-weight:850;text-shadow:0 12px 32px rgba(0,0,0,.55)}

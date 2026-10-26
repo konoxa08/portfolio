@@ -692,7 +692,7 @@ async function initScene() {
   function whyPose(tp) {
     const P = narrow(); let rr, h, th, ly;
     if (tp <= .55) { const q = 1 - Math.pow(1 - tp / .55, 2.2); rr = 3 + 12 * q; h = 2.6 + 8.4 * q; th = .75 * q; ly = 2.55 + 2.95 * q; }
-    else { const q = ease((tp - .55) / .45); rr = 15 + 4 * q; h = 11 + 6 * q; th = .75 + .25 * q; ly = 5.5 - 1.5 * q; }
+    else { const q = ease((tp - .55) / .45); rr = 15 + 2.5 * q; h = 11 + 3.5 * q; th = .75 + .2 * q; ly = 5.5 - 1 * q; }
     if (P) rr = rr * 1.3 + 2.5;
     return { p: V(A.x + rr * Math.sin(th), h, A.z + rr * Math.cos(th)), l: V(A.x, ly, A.z), f: P ? 55 : 38 };
   }
@@ -926,7 +926,7 @@ async function initScene() {
     if (vidFor && screens[vidFor]) screens[vidFor].haloM.color.copy(amb);
     for (const [id, sc] of Object.entries(screens)) if (id !== vidFor) sc.haloM.color.lerp(CY, Math.min(1, dt * 2));
     s.background.setRGB(.012 + amb.r * .018, .02 + amb.g * .018, .04 + amb.b * .02);
-    s.background.lerp(LIGHT, hz * .6); s.fog.color.copy(s.background); s.fog.density = .04 + .05 * hz;
+    s.background.lerp(LIGHT, hz * .6); s.fog.color.copy(s.background); s.fog.density = .04 + .008 * hz;
     const ro = 1 - rf;
     stage.visible = rf > .005;
     stageMs.forEach(m => m.material.opacity = smooth(.2, 1, rf) * (m.userData.o ?? 1));
