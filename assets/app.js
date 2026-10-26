@@ -253,6 +253,16 @@ function onScroll() {
 }
 addEventListener('scroll', onScroll, { passive: true }); onScroll();
 
+// gentle reveal: content settles in once, from a slight offset + blur
+if (!reduced && 'IntersectionObserver' in window) {
+  const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } }), { rootMargin: '0px 0px -8% 0px', threshold: .12 });
+  $$('.feat,.why-intro,.proc-h,.steps li,.proc-cta,#niches .pnl,#brief .pnl,.ct').forEach((el, i) => {
+    el.classList.add('rv');
+    if (el.matches('.steps li')) el.style.transitionDelay = `${[...el.parentNode.children].indexOf(el) * 70}ms`;
+    io.observe(el);
+  });
+}
+
 // light trail behind the cursor (desktop)
 if (finePointer && !reduced) {
   const tc = $('#trail'), tx = tc.getContext('2d'), pts = [];
@@ -790,9 +800,13 @@ async function initScene() {
     const orbT = kind === 'why' ? smooth(.03, .3, tp) : kind === 'proc' ? 1 : 0;
     orb += (orbT - orb) * Math.min(1, dt * 3);
     beam += ((kind === 'why' ? smooth(0, .05, tp) : kind === 'proc' ? 1 : 0) - beam) * Math.min(1, dt * 3);
-    let hz = kind === 'why' ? smooth(.6, .97, tp) : 0;
-    if (scrollY >= tops[PROC] - 2) { const pb = procEl.getBoundingClientRect().bottom; hz = clamp((pb - innerHeight * .75) / (innerHeight * .6)); }
+    // one uniform light veil, driven by where the light section is (not by the camera), so no seam appears
+    const pr = procEl.getBoundingClientRect();
+    let hz = smooth(0, 1, 1 - (pr.top - innerHeight * .06) / (innerHeight * .9));
+    hz *= smooth(0, 1, (pr.bottom - innerHeight * .2) / (innerHeight * .75));
     hazeEl.style.opacity = hz.toFixed(3);
+    const bl = hz > .01 && hz < .99 ? Math.sin(hz * Math.PI) * 7 : 0;
+    canvas.style.filter = bl > .2 ? `blur(${bl.toFixed(1)}px)` : '';
     document.body.classList.toggle('inwhy', kind === 'why' || kind === 'proc');
     document.body.classList.toggle('inworks', kind === 'work');
     railBtns.forEach((b, i) => b.classList.toggle('on', kind === 'work' && near - 1 === i));
@@ -806,7 +820,7 @@ async function initScene() {
     if (W.t0 !== W.seen) { W.seen = W.t0; W.fp = camP.clone(); W.fl = camL.clone(); }
     const wp = (now - W.t0) / W.dur;
     if (wp < 1 && !reduced) {
-      const e = ease(clamp(wp));
+      const k = clamp(wp), e = k < .5 ? 16 * k ** 5 : 1 - Math.pow(-2 * k + 2, 5) / 2;
       camP.lerpVectors(W.fp, tP, e); camL.lerpVectors(W.fl, tL, e);
       camP.y += Math.sin(e * Math.PI) * 1.4; camP.z += Math.sin(e * Math.PI) * 1.8;
       camF += (st.f - camF) * e;
