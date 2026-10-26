@@ -11,3 +11,7 @@ Static 3D portfolio (Three.js 0.160 from jsDelivr, no build). All content is in 
 - Up to 12 floating screens fit the 3D arc (6 featured + 6 extra slots). If there are more than 12 works,
   only the first 12 get screens; the rest still appear in the niche lists.
 - Commit and push to `main`; hosting redeploys automatically.
+
+## Owner contacts (real, used on the site)
+konoxa.motion · Telegram @konoxa08 · Instagram @knxa.new · +38 066 229 07 25 — set in `works.json` → `contacts`.
+The brief preview on the monitor shows a client's ad, so it keeps a placeholder phone.

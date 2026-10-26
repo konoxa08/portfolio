@@ -46,6 +46,7 @@ const igUrl = 'https://instagram.com/' + C.instagram.replace('@', '');
 $$('[data-c="name"]').forEach(e => e.textContent = C.name);
 $$('[data-c="tg-link"]').forEach(e => e.href = tgUrl);
 $$('[data-c="ig-link"]').forEach(e => e.href = igUrl);
+$$('[data-c="tel-link"]').forEach(e => e.href = 'tel:' + (C.phoneRaw || C.phone.replace(/[^+\d]/g, '')));
 $$('[data-t]').forEach(e => e.textContent = C[e.dataset.t]);
 $('#count').textContent = WORKS.length;
 $('#strip-n').textContent = data.niches.map(n => n.name).join(' · ');
@@ -351,7 +352,7 @@ function drawGen(now) {
   g.beginPath(); g.roundRect(150, 790 + (1 - e) * 20, 240, 58, 29); g.fill();
   g.fillStyle = S === 'kinetic' ? '#060606' : '#04060b'; g.font = `700 22px ${FONT}`;
   g.fillText('Замовити', 270, 827 + (1 - e) * 20);
-  g.fillStyle = 'rgba(230,242,255,.8)'; g.font = `600 22px ${FONT}`; g.fillText(C.phone, 270, 760 + (1 - e) * 20);
+  g.fillStyle = 'rgba(230,242,255,.8)'; g.font = `600 22px ${FONT}`; g.fillText('+38 0XX XXX XX XX', 270, 760 + (1 - e) * 20);
   g.globalAlpha = 1;
   // chrome
   g.textAlign = 'left'; g.font = `700 16px ${FONT}`; g.fillStyle = '#5dffb0'; g.fillText('● ПРЕВ\'Ю', 28, 44);
