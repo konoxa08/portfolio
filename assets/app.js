@@ -321,10 +321,10 @@ try {
 }
 
 async function initScene() {
-  const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }, { Reflector }, { RoomEnvironment }] = await Promise.all([
+  const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }, { Reflector }] = await Promise.all([
     import('three/addons/postprocessing/EffectComposer.js'), import('three/addons/postprocessing/RenderPass.js'),
     import('three/addons/postprocessing/UnrealBloomPass.js'), import('three/addons/postprocessing/OutputPass.js'),
-    import('three/addons/objects/Reflector.js'), import('three/addons/environments/RoomEnvironment.js')]);
+    import('three/addons/objects/Reflector.js')]);
   const canvas = $('#gl');
   const narrow = () => innerWidth / innerHeight < .8;
   const lowEnd = matchMedia('(max-width: 760px)').matches || (navigator.hardwareConcurrency || 8) <= 4;
@@ -335,7 +335,6 @@ async function initScene() {
   r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.3;
   const s = new THREE.Scene(); s.background = new THREE.Color(0x03050a); s.fog = new THREE.FogExp2(0x03050a, .04);
   const cam = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, .1, 100); s.add(cam);
-  const env = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), .04).texture;
 
   const man = new THREE.LoadingManager();
   man.onProgress = (u, a, b) => fill.style.width = Math.round(a / b * 100) + '%';
@@ -384,7 +383,7 @@ async function initScene() {
   const genT = new THREE.CanvasTexture(G); genT.colorSpace = THREE.SRGBColorSpace;
   const monV = new THREE.Mesh(new THREE.PlaneGeometry(1.125, 2), new THREE.MeshBasicMaterial({ toneMapped: false, color: new THREE.Color(.95, .95, .95) })); monV.position.z = .047; mon.add(monV);
 
-  /* ---- phones: titanium body, rounded glass, dynamic island ---- */
+  /* ---- video panels: rounded corners, glass edge, soft glow ---- */
   const rr = (w, h, rad) => {
     const sh = new THREE.Shape(), x = -w / 2, y = -h / 2;
     sh.moveTo(x + rad, y); sh.lineTo(x + w - rad, y); sh.quadraticCurveTo(x + w, y, x + w, y + rad);
@@ -395,17 +394,15 @@ async function initScene() {
   const flatUV = (geo, w, h) => { const p = geo.attributes.position, uv = geo.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + w / 2) / w, (p.getY(i) + h / 2) / h); uv.needsUpdate = true; return geo; };
   const SW = 1, SH = 1.778;
   const GEO = {
-    body: new THREE.ExtrudeGeometry(rr(1.1, 1.9, .19), { depth: .05, bevelEnabled: true, bevelThickness: .012, bevelSize: .012, bevelSegments: 3, curveSegments: 12 }).translate(0, 0, -.062),
-    black: new THREE.ShapeGeometry(rr(1.07, 1.87, .175), 12),
-    screen: flatUV(new THREE.ShapeGeometry(rr(SW, SH, .13), 12), SW, SH),
-    island: new THREE.ShapeGeometry(rr(.27, .078, .039), 8),
+    edge: new THREE.ShapeGeometry(rr(SW + .028, SH + .028, .114), 16),
+    back: new THREE.ShapeGeometry(rr(SW + .012, SH + .012, .106), 16),
+    screen: flatUV(new THREE.ShapeGeometry(rr(SW, SH, .1), 16), SW, SH),
     glow: new THREE.PlaneGeometry(2.3, 3.1),
-    btnL: new THREE.BoxGeometry(.016, .13, .028), btnR: new THREE.BoxGeometry(.016, .22, .028),
   };
-  const titan = new THREE.MeshStandardMaterial({ color: 0x8a919c, metalness: 1, roughness: .32, envMap: env, envMapIntensity: .55 });
-  const blackM = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const edgeM = new THREE.MeshBasicMaterial({ color: 0xbfeaff, transparent: true, opacity: .32, depthWrite: false, toneMapped: false });
+  const blackM = new THREE.MeshBasicMaterial({ color: 0x02040a });
   const glareC = document.createElement('canvas'); glareC.width = 64; glareC.height = 128;
-  { const x = glareC.getContext('2d'), gr = x.createLinearGradient(0, 0, 64, 128); gr.addColorStop(0, 'rgba(255,255,255,.22)'); gr.addColorStop(.35, 'rgba(255,255,255,.04)'); gr.addColorStop(.36, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 128); }
+  { const x = glareC.getContext('2d'), gr = x.createLinearGradient(0, 0, 64, 128); gr.addColorStop(0, 'rgba(255,255,255,.1)'); gr.addColorStop(.35, 'rgba(255,255,255,.02)'); gr.addColorStop(.36, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 128); }
   const glareM = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(glareC), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
   const haloC = document.createElement('canvas'); haloC.width = 230; haloC.height = 310;
   { const x = haloC.getContext('2d'); x.filter = 'blur(26px)'; x.fillStyle = '#fff'; x.beginPath(); x.roundRect(60, 65, 110, 180, 22); x.fill(); }
@@ -422,15 +419,12 @@ async function initScene() {
     const grp = new THREE.Group(); grp.position.copy(pos); grp.rotation.y = -a;
     const haloM = new THREE.MeshBasicMaterial({ map: haloT, color: 0x3fd6ff, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
     const halo = new THREE.Mesh(GEO.glow, haloM); halo.position.z = -.1; grp.add(halo);
-    grp.add(new THREE.Mesh(GEO.body, titan));
-    const bl = new THREE.Mesh(GEO.black, blackM); bl.position.z = .001; grp.add(bl);
+    const ed = new THREE.Mesh(GEO.edge, edgeM); ed.position.z = -.004; grp.add(ed);
+    const bk = new THREE.Mesh(GEO.back, blackM); bk.position.z = -.002; grp.add(bk);
     const poster = tex(`media/${w.id}.jpg`);
     const dim = ['gongpaper', 'bal', 'thetea'].includes(w.id) ? .72 : 1;
     const scr = new THREE.Mesh(GEO.screen, new THREE.MeshBasicMaterial({ map: poster, toneMapped: false, color: new THREE.Color(dim, dim, dim) }));
     scr.position.z = .003; scr.userData.id = w.id; grp.add(scr);
-    const gl = new THREE.Mesh(GEO.screen, glareM); gl.position.z = .005; grp.add(gl);
-    const isl = new THREE.Mesh(GEO.island, blackM); isl.position.set(0, SH / 2 - .07, .006); grp.add(isl);
-    for (const [g2, x, y] of [[GEO.btnL, -.562, .5], [GEO.btnL, -.562, .32], [GEO.btnR, .562, .38]]) { const b = new THREE.Mesh(g2, titan); b.position.set(x, y, -.03); grp.add(b); }
     s.add(grp);
     screens[w.id] = { grp, scr, haloM, poster, pos, n: new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)), lx: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)),
       homeQ: grp.quaternion.clone(), dim, base: pos.y, phase: i * 1.7, lvl: 1, ft: 0, hs: 1 };
@@ -630,7 +624,7 @@ async function initScene() {
     // focus pose in front of the camera
     cam.getWorldDirection(fwd); up.set(0, 1, 0).applyQuaternion(cam.quaternion);
     const visH = 2 * FD * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), visW = visH * cam.aspect;
-    const P = narrow(), FS = Math.min((P ? .57 : .78) * visH / 1.9, (P ? .84 : .84) * visW / 1.1);
+    const P = narrow(), FS = Math.min((P ? .6 : .8) * visH / 1.81, (P ? .86 : .84) * visW / 1.03);
     fp.copy(cam.position).addScaledVector(fwd, FD).addScaledVector(up, P ? -.045 * visH : -.01 * visH);
     eul.set(-mouse.y * .1, mouse.x * .16, 0); tq.setFromEuler(eul); fq.copy(cam.quaternion).multiply(tq);
 
