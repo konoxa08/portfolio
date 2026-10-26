@@ -4,13 +4,41 @@ const $$ = s => [...document.querySelectorAll(s)];
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const finePointer = matchMedia('(pointer: fine)').matches;
 
 const data = await (await fetch('works.json')).json();
 const WORKS = data.works, C = data.contacts;
 const byId = Object.fromEntries(WORKS.map(w => [w.id, w]));
 const NICHE = Object.fromEntries(data.niches.map(n => [n.id, n.name]));
 const FEAT = data.featured.map(id => byId[id]).filter(Boolean);
+const ORDER = [...FEAT, ...WORKS.filter(w => !FEAT.includes(w))];
 const BN = Object.fromEntries(data.briefNiches.map(n => [n.id, n]));
+
+/* ---------------- smooth scroll ---------------- */
+let lenis = null;
+if (window.Lenis && !reduced) {
+  lenis = new window.Lenis({ lerp: .085, wheelMultiplier: .9, smoothWheel: true });
+  const raf = t => { lenis.raf(t); requestAnimationFrame(raf); };
+  requestAnimationFrame(raf);
+}
+const lockScroll = on => {
+  if (lenis) on ? lenis.stop() : lenis.start();
+  document.documentElement.style.overflow = on ? 'hidden' : '';
+};
+// jump with a cinematic camera flight instead of scrolling through every section
+const W = { t0: -1e9, dur: 1500 };
+function go(el) {
+  if (!el) return;
+  const y = el.getBoundingClientRect().top + scrollY;
+  if (Math.abs(y - scrollY) < 4) return;
+  document.body.classList.add('warping');
+  W.pending = () => {
+    if (lenis) lenis.scrollTo(y, { immediate: true, force: true }); else scrollTo(0, y);
+    W.t0 = performance.now();
+    setTimeout(() => document.body.classList.remove('warping'), 60);
+  };
+  setTimeout(() => { if (W.pending) { W.pending(); W.pending = null; } }, 230);
+}
 
 /* ---------------- DOM ---------------- */
 const tgUrl = 'https://t.me/' + C.telegram.replace('@', '');
@@ -35,9 +63,17 @@ FEAT.forEach((w, i) => {
   worksHost.append(a);
   const li = document.createElement('li');
   li.innerHTML = `<button type="button" data-i="${i}"><span>${NICHE[w.niche]}</span><i></i></button>`;
-  li.firstChild.onclick = () => a.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+  li.firstChild.onclick = () => go(a);
   rail.append(li);
 });
+
+// in-page links fly the camera
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#"]'); if (!a) return;
+  const el = document.querySelector(a.getAttribute('href')); if (!el) return;
+  e.preventDefault(); a.blur(); go(el);
+});
+$('#home').onclick = () => go($('#hero'));
 
 // niches
 let curNiche = data.niches[0].id;
@@ -78,14 +114,6 @@ $('#bform').addEventListener('submit', e => {
   window.open(tgUrl, '_blank', 'noopener');
 });
 
-// in-page links: scroll by script so they work inside embedded viewers too
-document.addEventListener('click', e => {
-  const a = e.target.closest('a[href^="#"]'); if (!a) return;
-  const el = document.querySelector(a.getAttribute('href')); if (!el) return;
-  e.preventDefault();
-  scrollTo({ top: el.getBoundingClientRect().top + scrollY, behavior: reduced ? 'auto' : 'smooth' });
-});
-
 // copy + toast
 const toast = $('#toast'); let toastT;
 function say(msg) { toast.textContent = msg; toast.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove('on'), 2600); }
@@ -95,31 +123,68 @@ async function copy(text, msg) {
 }
 $$('.cp').forEach(b => b.onclick = () => copy(C[b.dataset.copy], 'Скопійовано: ' + C[b.dataset.copy]));
 
-// player
+// fallback player (only without WebGL)
 const dlg = $('#player'), pv = $('#pv');
-function openPlayer(id) {
+function openDialog(id) {
   const w = byId[id]; if (!w) return;
   pv.src = 'media/' + id + '.mp4'; pv.poster = 'media/' + id + '.jpg';
   $('#pt').textContent = w.title; $('#ps').textContent = `${NICHE[w.niche]} · ${w.style} · ${w.dur} с`;
   if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
   pv.muted = false; pv.play().catch(() => {});
 }
-function closePlayer() { pv.pause(); dlg.close ? dlg.close() : dlg.removeAttribute('open'); }
-document.addEventListener('click', e => {
-  const b = e.target.closest('.play,.nlist button'); if (b) openPlayer(b.dataset.id);
-});
-$('#px').onclick = closePlayer;
-dlg.addEventListener('click', e => { if (e.target === dlg) closePlayer(); });
+function closeDialog() { pv.pause(); dlg.close ? dlg.close() : dlg.removeAttribute('open'); }
+$('#px').onclick = closeDialog;
+dlg.addEventListener('click', e => { if (e.target === dlg) closeDialog(); });
 dlg.addEventListener('close', () => pv.pause());
+let openWork = openDialog;
+document.addEventListener('click', e => {
+  const b = e.target.closest('.play,.nlist button'); if (b) openWork(b.dataset.id);
+});
 
 // sound toggle (scene video)
 let soundOn = false;
 const snd = $('#snd');
 snd.onclick = () => {
   soundOn = !soundOn; snd.setAttribute('aria-pressed', soundOn);
-  if (window.__vid) { window.__vid.muted = !soundOn; window.__vid.play().catch(() => {}); }
+  if (window.__vid && !document.body.classList.contains('focus')) { window.__vid.muted = !soundOn; window.__vid.play().catch(() => {}); }
   say(soundOn ? 'Звук увімкнено' : 'Звук вимкнено');
 };
+
+// home button visibility + active nav link
+const homeBtn = $('#home'), navLinks = $$('.links a');
+function onScroll() {
+  homeBtn.classList.toggle('on', scrollY > innerHeight * .6);
+  const mid = scrollY + innerHeight * .5;
+  let act = null;
+  for (const a of navLinks) { const el = $(a.getAttribute('href')); if (el && el.getBoundingClientRect().top + scrollY <= mid) act = a; }
+  navLinks.forEach(a => a.classList.toggle('act', a === act));
+}
+addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+// light trail behind the cursor (desktop)
+if (finePointer && !reduced) {
+  const tc = $('#trail'), tx = tc.getContext('2d'), pts = [];
+  const size = () => { tc.width = innerWidth * Math.min(devicePixelRatio, 2); tc.height = innerHeight * Math.min(devicePixelRatio, 2); };
+  size(); addEventListener('resize', size);
+  addEventListener('pointermove', e => { if (e.pointerType === 'mouse') pts.push({ x: e.clientX, y: e.clientY, t: performance.now() }); });
+  const draw = () => {
+    const now = performance.now(), k = tc.width / innerWidth;
+    while (pts.length && now - pts[0].t > 420) pts.shift();
+    tx.clearRect(0, 0, tc.width, tc.height);
+    if (pts.length > 2) {
+      tx.save(); tx.scale(k, k); tx.lineCap = 'round'; tx.lineJoin = 'round'; tx.globalCompositeOperation = 'lighter';
+      for (let i = 1; i < pts.length; i++) {
+        const a = 1 - (now - pts[i].t) / 420;
+        tx.strokeStyle = `rgba(63,214,255,${a * .55})`; tx.shadowColor = '#3fd6ff'; tx.shadowBlur = 12;
+        tx.lineWidth = 1 + a * 3;
+        tx.beginPath(); tx.moveTo(pts[i - 1].x, pts[i - 1].y); tx.lineTo(pts[i].x, pts[i].y); tx.stroke();
+      }
+      tx.restore();
+    }
+    requestAnimationFrame(draw);
+  };
+  requestAnimationFrame(draw);
+}
 
 /* ---------------- brief preview generator (canvas 540x960) ---------------- */
 const ICONS = {
@@ -256,10 +321,10 @@ try {
 }
 
 async function initScene() {
-  const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }, { Reflector }] = await Promise.all([
+  const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }, { Reflector }, { RoomEnvironment }] = await Promise.all([
     import('three/addons/postprocessing/EffectComposer.js'), import('three/addons/postprocessing/RenderPass.js'),
     import('three/addons/postprocessing/UnrealBloomPass.js'), import('three/addons/postprocessing/OutputPass.js'),
-    import('three/addons/objects/Reflector.js')]);
+    import('three/addons/objects/Reflector.js'), import('three/addons/environments/RoomEnvironment.js')]);
   const canvas = $('#gl');
   const narrow = () => innerWidth / innerHeight < .8;
   const lowEnd = matchMedia('(max-width: 760px)').matches || (navigator.hardwareConcurrency || 8) <= 4;
@@ -269,7 +334,8 @@ async function initScene() {
   r.setPixelRatio(dpr); r.setSize(innerWidth, innerHeight, false);
   r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.3;
   const s = new THREE.Scene(); s.background = new THREE.Color(0x03050a); s.fog = new THREE.FogExp2(0x03050a, .04);
-  const cam = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, .1, 100);
+  const cam = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, .1, 100); s.add(cam);
+  const env = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), .04).texture;
 
   const man = new THREE.LoadingManager();
   man.onProgress = (u, a, b) => fill.style.width = Math.round(a / b * 100) + '%';
@@ -318,29 +384,63 @@ async function initScene() {
   const genT = new THREE.CanvasTexture(G); genT.colorSpace = THREE.SRGBColorSpace;
   const monV = new THREE.Mesh(new THREE.PlaneGeometry(1.125, 2), new THREE.MeshBasicMaterial({ toneMapped: false, color: new THREE.Color(.95, .95, .95) })); monV.position.z = .047; mon.add(monV);
 
-  // floating screens on an arc around the room
+  /* ---- phones: titanium body, rounded glass, dynamic island ---- */
+  const rr = (w, h, rad) => {
+    const sh = new THREE.Shape(), x = -w / 2, y = -h / 2;
+    sh.moveTo(x + rad, y); sh.lineTo(x + w - rad, y); sh.quadraticCurveTo(x + w, y, x + w, y + rad);
+    sh.lineTo(x + w, y + h - rad); sh.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+    sh.lineTo(x + rad, y + h); sh.quadraticCurveTo(x, y + h, x, y + h - rad);
+    sh.lineTo(x, y + rad); sh.quadraticCurveTo(x, y, x + rad, y); return sh;
+  };
+  const flatUV = (geo, w, h) => { const p = geo.attributes.position, uv = geo.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + w / 2) / w, (p.getY(i) + h / 2) / h); uv.needsUpdate = true; return geo; };
+  const SW = 1, SH = 1.778;
+  const GEO = {
+    body: new THREE.ExtrudeGeometry(rr(1.1, 1.9, .19), { depth: .05, bevelEnabled: true, bevelThickness: .012, bevelSize: .012, bevelSegments: 3, curveSegments: 12 }).translate(0, 0, -.062),
+    black: new THREE.ShapeGeometry(rr(1.07, 1.87, .175), 12),
+    screen: flatUV(new THREE.ShapeGeometry(rr(SW, SH, .13), 12), SW, SH),
+    island: new THREE.ShapeGeometry(rr(.27, .078, .039), 8),
+    glow: new THREE.PlaneGeometry(2.3, 3.1),
+    btnL: new THREE.BoxGeometry(.016, .13, .028), btnR: new THREE.BoxGeometry(.016, .22, .028),
+  };
+  const titan = new THREE.MeshStandardMaterial({ color: 0x8a919c, metalness: 1, roughness: .32, envMap: env, envMapIntensity: .55 });
+  const blackM = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const glareC = document.createElement('canvas'); glareC.width = 64; glareC.height = 128;
+  { const x = glareC.getContext('2d'), gr = x.createLinearGradient(0, 0, 64, 128); gr.addColorStop(0, 'rgba(255,255,255,.22)'); gr.addColorStop(.35, 'rgba(255,255,255,.04)'); gr.addColorStop(.36, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 128); }
+  const glareM = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(glareC), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const haloC = document.createElement('canvas'); haloC.width = 230; haloC.height = 310;
+  { const x = haloC.getContext('2d'); x.filter = 'blur(26px)'; x.fillStyle = '#fff'; x.beginPath(); x.roundRect(60, 65, 110, 180, 22); x.fill(); }
+  const haloT = new THREE.CanvasTexture(haloC);
+
   const O = new THREE.Vector3(0.6, 0, 5.5), R = 8;
-  const order = [...FEAT, ...WORKS.filter(w => !FEAT.includes(w))];
   const featSlots = [-46, -34, -22, 22, 34, 46], extra = [-58, 58, -70, 70, -82, 82];
-  const H = { '-82': 3.3, '-70': 2.5, '-58': 3.6, '-46': 2.4, '-34': 3.8, '-22': 2.3, '22': 2.3, '34': 3.8, '46': 2.4, '58': 3.6, '70': 2.5, '82': 3.3 };
+  const HGT = { '-82': 3.3, '-70': 2.5, '-58': 3.6, '-46': 2.4, '-34': 3.8, '-22': 2.3, '22': 2.3, '34': 3.8, '46': 2.4, '58': 3.6, '70': 2.5, '82': 3.3 };
   const screens = {};
-  order.forEach((w, i) => {
+  ORDER.forEach((w, i) => {
     const ang = i < FEAT.length ? featSlots[i] : extra[i - FEAT.length]; if (ang === undefined) return;
     const a = THREE.MathUtils.degToRad(ang);
-    const pos = new THREE.Vector3(O.x + R * Math.sin(a), H[ang], O.z - R * Math.cos(a));
+    const pos = new THREE.Vector3(O.x + R * Math.sin(a), HGT[ang], O.z - R * Math.cos(a));
     const grp = new THREE.Group(); grp.position.copy(pos); grp.rotation.y = -a;
-    const fr = new THREE.Mesh(new THREE.BoxGeometry(1.08, 1.86, .05), new THREE.MeshStandardMaterial({ color: 0x0b0d12, metalness: .8, roughness: .25 })); grp.add(fr);
-    const rimM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x3fd6ff).multiplyScalar(1.3) });
-    const rim = new THREE.Mesh(new THREE.PlaneGeometry(1.035, 1.813), rimM); rim.position.z = .027; grp.add(rim);
+    const haloM = new THREE.MeshBasicMaterial({ map: haloT, color: 0x3fd6ff, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+    const halo = new THREE.Mesh(GEO.glow, haloM); halo.position.z = -.1; grp.add(halo);
+    grp.add(new THREE.Mesh(GEO.body, titan));
+    const bl = new THREE.Mesh(GEO.black, blackM); bl.position.z = .001; grp.add(bl);
     const poster = tex(`media/${w.id}.jpg`);
-    const dim = ['gongpaper', 'bal', 'thetea'].includes(w.id) ? .66 : 1;
-    const scr = new THREE.Mesh(new THREE.PlaneGeometry(1, 1.778), new THREE.MeshBasicMaterial({ map: poster, toneMapped: false, color: new THREE.Color(dim, dim, dim) }));
-    scr.position.z = .03; grp.add(scr);
+    const dim = ['gongpaper', 'bal', 'thetea'].includes(w.id) ? .72 : 1;
+    const scr = new THREE.Mesh(GEO.screen, new THREE.MeshBasicMaterial({ map: poster, toneMapped: false, color: new THREE.Color(dim, dim, dim) }));
+    scr.position.z = .003; scr.userData.id = w.id; grp.add(scr);
+    const gl = new THREE.Mesh(GEO.screen, glareM); gl.position.z = .005; grp.add(gl);
+    const isl = new THREE.Mesh(GEO.island, blackM); isl.position.set(0, SH / 2 - .07, .006); grp.add(isl);
+    for (const [g2, x, y] of [[GEO.btnL, -.562, .5], [GEO.btnL, -.562, .32], [GEO.btnR, .562, .38]]) { const b = new THREE.Mesh(g2, titan); b.position.set(x, y, -.03); grp.add(b); }
     s.add(grp);
-    const n = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)), lx = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
-    screens[w.id] = { grp, scr, rimM, poster, pos, n, lx, dim, base: pos.y, phase: i * 1.7, lvl: 1 };
+    screens[w.id] = { grp, scr, haloM, poster, pos, n: new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)), lx: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)),
+      homeQ: grp.quaternion.clone(), dim, base: pos.y, phase: i * 1.7, lvl: 1, ft: 0, hs: 1 };
   });
   monV.material.map = screens[FEAT[0].id].poster;
+
+  // focus backdrop rides with the camera
+  const FD = 3;
+  const dimM = new THREE.MeshBasicMaterial({ color: 0x020409, transparent: true, opacity: 0, depthWrite: false });
+  const dimP = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), dimM); dimP.position.z = -(FD + .9); cam.add(dimP);
 
   // dust
   const nd = lowEnd ? 220 : 520, pg = new THREE.BufferGeometry(), pts = new Float32Array(nd * 3);
@@ -368,6 +468,45 @@ async function initScene() {
     vidId = id; vid.src = `media/${id}.mp4`; vid.muted = !soundOn; vid.play().catch(() => {});
   };
 
+  /* ---- viewer: the phone itself flies to you ---- */
+  const FOCUS = { id: null, sound: true };
+  const vw = { k: $('#vk'), t: $('#vt'), d: $('#vd'), n: $('#vn'), fill: $('#vfill'), time: $('#vtime'), play: $('#vplay'), snd: $('#vsnd') };
+  const fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+  function openViewer(id) {
+    if (!screens[id]) return openDialog(id);
+    const w = byId[id];
+    FOCUS.id = id; document.body.classList.add('focus'); lockScroll(true);
+    vidId = id; vid.src = `media/${id}.mp4`; vid.muted = !FOCUS.sound; vid.currentTime = 0; vid.play().catch(() => {});
+    vw.k.textContent = `${NICHE[w.niche]} · ${w.style}`; vw.t.textContent = w.title; vw.d.textContent = w.desc;
+    const i = ORDER.indexOf(w); vw.n.textContent = `${String(i + 1).padStart(2, '0')} / ${String(ORDER.length).padStart(2, '0')}`;
+    vw.snd.setAttribute('aria-pressed', FOCUS.sound);
+  }
+  function closeViewer() {
+    if (!FOCUS.id) return;
+    FOCUS.id = null; document.body.classList.remove('focus'); lockScroll(false);
+    vid.muted = !soundOn;
+  }
+  const step = d => { if (!FOCUS.id) return; const i = ORDER.findIndex(w => w.id === FOCUS.id); openViewer(ORDER[(i + d + ORDER.length) % ORDER.length].id); };
+  openWork = openViewer;
+  $('#vx').onclick = closeViewer; $('#vprev').onclick = () => step(-1); $('#vnext').onclick = () => step(1);
+  vw.play.onclick = () => vid.paused ? vid.play() : vid.pause();
+  vw.snd.onclick = () => { FOCUS.sound = !FOCUS.sound; vid.muted = !FOCUS.sound; vw.snd.setAttribute('aria-pressed', FOCUS.sound); };
+  const track = $('#vtrack');
+  const seek = e => { const b = track.getBoundingClientRect(); if (vid.duration) vid.currentTime = clamp((e.clientX - b.left) / b.width) * vid.duration; };
+  track.addEventListener('pointerdown', e => { seek(e); track.setPointerCapture(e.pointerId); track.onpointermove = seek; });
+  track.addEventListener('pointerup', () => track.onpointermove = null);
+  addEventListener('keydown', e => {
+    if (!FOCUS.id) return;
+    if (e.key === 'Escape') closeViewer(); else if (e.key === 'ArrowRight') step(1); else if (e.key === 'ArrowLeft') step(-1);
+    else if (e.key === ' ') { e.preventDefault(); vw.play.click(); }
+  });
+  let sw = null; // swipe on phones
+  addEventListener('pointerdown', e => { if (FOCUS.id && e.pointerType !== 'mouse' && !e.target.closest('.vw-bar')) sw = { x: e.clientX, y: e.clientY }; });
+  addEventListener('pointerup', e => {
+    if (!sw) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) step(dx < 0 ? 1 : -1); else if (dy > 90) closeViewer();
+  });
+
   // camera keys, one per scroll section
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   let K = [];
@@ -376,22 +515,21 @@ async function initScene() {
     K.push(P ? { p: V(0.6, 2.7, 15), l: V(0.6, 3.3, 0), f: 55 } : { p: V(-2.4, 2.2, 11), l: V(1.6, 2.4, 0), f: 38 });
     FEAT.forEach(w => {
       const sc = screens[w.id];
-      if (P) K.push({ p: sc.pos.clone().addScaledVector(sc.n, 3.1).add(V(0, -.6, 0)), l: sc.pos.clone().add(V(0, -.6, 0)), f: 52 });
-      else K.push({ p: sc.pos.clone().addScaledVector(sc.n, 3.3).addScaledVector(sc.lx, -.8), l: sc.pos.clone().addScaledVector(sc.lx, -.8), f: 38 });
+      if (P) K.push({ p: sc.pos.clone().addScaledVector(sc.n, 4.3).add(V(0, -.7, 0)), l: sc.pos.clone().add(V(0, -.7, 0)), f: 52 });
+      else K.push({ p: sc.pos.clone().addScaledVector(sc.n, 3.9).addScaledVector(sc.lx, -.85), l: sc.pos.clone().addScaledVector(sc.lx, -.85), f: 38 });
     });
     K.push(P ? { p: V(0.6, 2.9, 15.5), l: V(0.6, 3.8, 0), f: 55 } : { p: V(-4.4, 2.1, 10.6), l: V(-1.1, 2.3, 0), f: 38 });
     K.push(P ? { p: V(0.6, 2.35, 3.0), l: V(0.6, 1.75, -2.75), f: 52 } : { p: V(-2.4, 2.45, 4.0), l: V(-0.5, 2.5, -2.75), f: 38 });
     K.push(P ? { p: V(0.6, 7, 17), l: V(0.6, 3.6, 0), f: 55 } : { p: V(0.6, 6.2, 14), l: V(2.2, 2.4, 0), f: 38 });
   }
   buildKeys();
-  const secs = () => [$('#hero'), ...$$('.chap'), $('#niches'), $('#brief'), $('#contact')];
-  let SE = secs(), tops = [];
+  const SE = [$('#hero'), ...$$('.chap'), $('#niches'), $('#brief'), $('#contact')];
+  let tops = [];
   const measure = () => { tops = SE.map(e => e.getBoundingClientRect().top + scrollY); };
   measure();
 
   const camP = K[0].p.clone().add(V(0, 1.2, 7)), camL = K[0].l.clone(); let camF = K[0].f;
   const tP = new THREE.Vector3(), tL = new THREE.Vector3();
-  let mode = { kind: 'hero', idx: -1 };
   function target() {
     const y = scrollY + 1;
     let k = 0; for (let i = 0; i < tops.length; i++) if (tops[i] <= y) k = i;
@@ -412,33 +550,35 @@ async function initScene() {
 
   // adaptive quality
   let slow = 0, last = performance.now(), degraded = false, vidFor0 = null;
-  function degrade() { degraded = true; dpr = 1; r.setPixelRatio(1); comp.setPixelRatio(1); bloom.strength = .6; if (reflector) reflector.visible = false; }
+  function degrade() { degraded = true; dpr = 1; r.setPixelRatio(1); comp.setPixelRatio(1); if (reflector) reflector.visible = false; }
 
   const railBtns = $$('#rail button'), caps = $$('.chap .cap');
-  // pointer: camera parallax + clickable screens
+  // pointer: parallax, hover, click
   const mouse = { x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, has: false };
-  const UI = 'a,button,input,select,label,textarea,.glass,.cap,dialog,.nav,.ct,.hero-in,.rail';
+  const UI = 'a,button,input,select,label,textarea,.glass,.cap,dialog,.nav,.ct,.hero-in,.rail,.vw-bar,.vw-info,.vw-x,#home';
   const hov = document.createElement('div'); hov.className = 'hov'; document.body.append(hov);
   addEventListener('pointermove', e => {
     if (e.pointerType === 'mouse') { mouse.tx = e.clientX / innerWidth * 2 - 1; mouse.ty = e.clientY / innerHeight * 2 - 1; }
     mouse.px = e.clientX; mouse.py = e.clientY; mouse.has = !e.target.closest(UI);
   });
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-  const picks = Object.entries(screens).map(([id, sc]) => { sc.scr.userData.id = id; return sc.scr; });
-  monV.userData.id = null; picks.push(monV);
+  const picks = Object.values(screens).map(sc => sc.scr); monV.userData.id = null; picks.push(monV);
   let hoverId = null;
-  function pick() {
+  function pick(list = picks) {
     if (!mouse.has || mouse.px < 0) return null;
     ndc.set(mouse.px / innerWidth * 2 - 1, -(mouse.py / innerHeight) * 2 + 1);
     ray.setFromCamera(ndc, cam);
-    const h = ray.intersectObjects(picks, false)[0];
+    const h = ray.intersectObjects(list, false)[0];
     return h ? h.object.userData.id : null;
   }
   document.addEventListener('click', e => {
     if (e.target.closest(UI)) return;
     mouse.px = e.clientX; mouse.py = e.clientY; mouse.has = true;
-    const id = pick(); if (id) openPlayer(id);
+    if (FOCUS.id) { if (pick([screens[FOCUS.id].scr])) vw.play.click(); else closeViewer(); return; }
+    const id = pick(); if (id) openViewer(id);
   });
+
+  const fwd = new THREE.Vector3(), rt = new THREE.Vector3(), up = new THREE.Vector3(), fp = new THREE.Vector3(), fq = new THREE.Quaternion(), tq = new THREE.Quaternion(), eul = new THREE.Euler(), hp = new THREE.Vector3();
   let started = false;
   function frame(now) {
     const dt = Math.min(.1, (now - last) / 1000); last = now;
@@ -448,45 +588,73 @@ async function initScene() {
     const nF = FEAT.length;
     const kind = near === 0 ? 'hero' : near <= nF ? 'work' : near === nF + 1 ? 'niche' : near === nF + 2 ? 'brief' : 'contact';
     document.body.classList.toggle('inworks', kind === 'work');
+    railBtns.forEach((b, i) => b.classList.toggle('on', kind === 'work' && near - 1 === i));
     const kf = st.k + st.e;
     caps.forEach((c, i) => { const o = clamp(1 - Math.abs(kf - (i + 1)) * 2.6); c.style.opacity = o; c.style.visibility = o < .01 ? 'hidden' : ''; });
-    const bs = kind === 'work' ? .32 : kind === 'brief' ? .45 : .85, bt = kind === 'work' ? .92 : .62;
+    const focusAmt = Math.max(0, ...Object.values(screens).map(sc => sc.ft));
+    const bs = FOCUS.id || kind === 'work' ? .3 : kind === 'brief' ? .45 : .85, bt = FOCUS.id || kind === 'work' ? .92 : .62;
     bloom.strength += (bs * (degraded ? .7 : 1) - bloom.strength) * Math.min(1, dt * 4); bloom.threshold += (bt - bloom.threshold) * Math.min(1, dt * 4);
-    railBtns.forEach((b, i) => b.classList.toggle('on', kind === 'work' && near - 1 === i));
 
-    // camera
-    const a = reduced ? 1 : 1 - Math.exp(-dt * 4.5);
-    camP.lerp(tP, a); camL.lerp(tL, a); camF += (st.f - camF) * a;
+    // camera: cinematic flight after a jump, damped follow otherwise
+    if (W.t0 !== W.seen) { W.seen = W.t0; W.fp = camP.clone(); W.fl = camL.clone(); }
+    const wp = (now - W.t0) / W.dur;
+    if (wp < 1 && !reduced) {
+      const e = ease(clamp(wp));
+      camP.lerpVectors(W.fp, tP, e); camL.lerpVectors(W.fl, tL, e);
+      camP.y += Math.sin(e * Math.PI) * 1.4; camP.z += Math.sin(e * Math.PI) * 1.8;
+      camF += (st.f - camF) * e;
+    } else {
+      const a = reduced ? 1 : 1 - Math.exp(-dt * 4.5);
+      camP.lerp(tP, a); camL.lerp(tL, a); camF += (st.f - camF) * a;
+    }
     mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 2.5); mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 2.5);
-    const amp = reduced ? 0 : kind === 'work' ? .35 : kind === 'brief' ? .3 : .8;
-    const fwd = tL.clone().sub(camP).normalize(), rt = fwd.clone().cross(cam.up).normalize();
+    const amp = reduced ? 0 : (kind === 'work' ? .35 : kind === 'brief' ? .3 : .8) * (1 - focusAmt * .8);
+    fwd.subVectors(camL, camP).normalize(); rt.crossVectors(fwd, cam.up).normalize();
     cam.position.copy(camP).addScaledVector(rt, mouse.x * amp).addScaledVector(cam.up, -mouse.y * amp * .5);
-    cam.fov = camF; cam.updateProjectionMatrix(); cam.lookAt(camL);
-    monV.userData.id = kind === 'brief' ? null : (vidFor0 || FEAT[0].id);
-    hoverId = pick();
-    document.body.classList.toggle('pick', !!hoverId);
-    if (hoverId) { const w = byId[hoverId]; hov.textContent = w.title; hov.style.transform = `translate(${mouse.px + 16}px,${mouse.py + 18}px)`; hov.classList.add('on'); }
-    else hov.classList.remove('on');
+    cam.fov = camF; cam.updateProjectionMatrix(); cam.lookAt(camL); cam.updateMatrixWorld();
 
     // what plays where
     let vidTarget = null, vidFor = null;
-    if (kind === 'work') { vidFor = FEAT[near - 1].id; vidTarget = screens[vidFor].scr; }
+    if (FOCUS.id) { vidFor = FOCUS.id; vidTarget = screens[FOCUS.id].scr; }
+    else if (kind === 'work') { vidFor = FEAT[near - 1].id; vidTarget = screens[vidFor].scr; }
     else if (kind === 'niche') { vidFor = WORKS.find(w => w.niche === curNiche).id; vidTarget = monV; }
     else if (kind === 'hero' || kind === 'contact') { vidFor = FEAT[0].id; vidTarget = monV; }
     if (vidFor) wantVideo(vidFor); vidFor0 = vidFor;
+    monV.userData.id = kind === 'brief' ? null : (vidFor0 || FEAT[0].id);
+    hoverId = FOCUS.id ? null : pick();
+    document.body.classList.toggle('pick', !!hoverId || (!!FOCUS.id && !!pick([screens[FOCUS.id].scr])));
+    if (hoverId) { hov.textContent = byId[hoverId].title; hov.style.transform = `translate(${mouse.px + 16}px,${mouse.py + 18}px)`; hov.classList.add('on'); }
+    else hov.classList.remove('on');
+
     const vReady = vid.readyState >= 2 && !vid.paused;
+    // focus pose in front of the camera
+    cam.getWorldDirection(fwd); up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+    const visH = 2 * FD * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), visW = visH * cam.aspect;
+    const P = narrow(), FS = Math.min((P ? .57 : .78) * visH / 1.9, (P ? .84 : .84) * visW / 1.1);
+    fp.copy(cam.position).addScaledVector(fwd, FD).addScaledVector(up, P ? -.045 * visH : -.01 * visH);
+    eul.set(-mouse.y * .1, mouse.x * .16, 0); tq.setFromEuler(eul); fq.copy(cam.quaternion).multiply(tq);
+
     for (const [id, sc] of Object.entries(screens)) {
       const on = vidTarget === sc.scr;
       const m = on && vReady ? vtex : sc.poster;
       if (sc.scr.material.map !== m) { sc.scr.material.map = m; sc.scr.material.needsUpdate = true; }
-      const want = kind === 'niche' ? (byId[id].niche === curNiche ? 1 : .16) : on ? 1 : kind === 'work' ? .45 : 1;
+      sc.ft = clamp(sc.ft + (FOCUS.id === id ? 1 : -1) * dt / (reduced ? .01 : .85));
+      const want = FOCUS.id ? (FOCUS.id === id ? 1 : .15) : kind === 'niche' ? (byId[id].niche === curNiche ? 1 : .16) : on ? 1 : kind === 'work' ? .45 : 1;
       sc.lvl += (want - sc.lvl) * Math.min(1, dt * 5);
       const c = sc.lvl * (on ? 1 : sc.dim);
       sc.scr.material.color.setRGB(c, c, c);
-      sc.rimM.color.setHex(0x3fd6ff).multiplyScalar((on ? 1.5 + Math.sin(now / 300) * .2 : hoverId === id ? 2.2 : 1.3) * (.35 + .65 * sc.lvl));
-      if (!reduced) sc.grp.position.y = sc.base + Math.sin(now / 1400 + sc.phase) * .05;
-      const hs = hoverId === id ? 1.06 : 1; sc.grp.scale.setScalar(sc.grp.scale.x + (hs - sc.grp.scale.x) * Math.min(1, dt * 8));
+      sc.haloM.opacity = (on ? .42 + Math.sin(now / 400) * .06 : hoverId === id ? .7 : .3) * (.3 + .7 * sc.lvl) * (1 - sc.ft * .6);
+      sc.hs += ((hoverId === id ? 1.06 : 1) - sc.hs) * Math.min(1, dt * 8);
+      hp.copy(sc.pos); if (!reduced) hp.y = sc.base + Math.sin(now / 1400 + sc.phase) * .05;
+      if (sc.ft > 0) {
+        const e = ease(sc.ft);
+        sc.grp.position.lerpVectors(hp, fp, e).addScaledVector(up, Math.sin(e * Math.PI) * .35);
+        sc.grp.quaternion.slerpQuaternions(sc.homeQ, fq, e);
+        sc.grp.scale.setScalar((1 + (FS - 1) * e) * sc.hs);
+        sc.grp.renderOrder = 2;
+      } else { sc.grp.position.copy(hp); sc.grp.quaternion.copy(sc.homeQ); sc.grp.scale.setScalar(sc.hs); }
     }
+    dimM.opacity = focusAmt * .82;
     let mm;
     if (kind === 'brief') { drawGen(now); genT.needsUpdate = true; mm = genT; }
     else if (vidTarget === monV && vReady) mm = vtex;
@@ -495,6 +663,12 @@ async function initScene() {
     glow.material.opacity = .14 + (kind === 'brief' ? .1 : 0);
     if (!reduced) dust.rotation.y = now / 90000;
 
+    if (FOCUS.id) {
+      const d = vid.duration || 0;
+      vw.fill.style.transform = `scaleX(${d ? vid.currentTime / d : 0})`;
+      vw.time.textContent = `${fmt(vid.currentTime || 0)} / ${fmt(d)}`;
+      vw.play.setAttribute('aria-pressed', !vid.paused);
+    }
     comp.render();
     requestAnimationFrame(frame);
   }

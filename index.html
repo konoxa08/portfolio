@@ -14,6 +14,7 @@
 <body>
 <canvas id="gl" aria-hidden="true"></canvas>
 <div class="scrim" aria-hidden="true"></div>
+<canvas id="trail" aria-hidden="true"></canvas>
 
 <div id="loader" role="status">
   <div class="ld-mark"></div>
@@ -107,6 +108,30 @@
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<button id="home" class="home" type="button" aria-label="На головну">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v8.5h11V10"/></svg><span>Головна</span>
+</button>
+
+<div id="viewer" aria-live="polite">
+  <div class="vw-info">
+    <p class="vw-n" id="vn"></p>
+    <p class="vw-k" id="vk"></p>
+    <h2 id="vt"></h2>
+    <p class="vw-d" id="vd"></p>
+    <p class="vw-tip">← → гортати · Esc закрити</p>
+  </div>
+  <div class="vw-bar">
+    <button type="button" id="vprev" aria-label="Попередній ролик"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button type="button" id="vplay" class="vw-play" aria-label="Пауза / відтворення" aria-pressed="true"><svg class="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg><svg class="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg></button>
+    <div class="vw-track" id="vtrack"><i id="vfill"></i></div>
+    <span class="vw-time" id="vtime">0:00</span>
+    <button type="button" id="vsnd" aria-label="Звук" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path class="w" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+    <button type="button" id="vnext" aria-label="Наступний ролик"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <button type="button" class="vw-x" id="vx">Закрити <kbd>Esc</kbd></button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script type="module" src="assets/app.js"></script>
 </body>
