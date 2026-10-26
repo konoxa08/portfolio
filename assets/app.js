@@ -42,6 +42,19 @@ addEventListener('wheel', e => {
   }
 }, { passive: false });
 const lockScroll = on => { SS.run = false; document.documentElement.style.overflow = on ? 'hidden' : ''; };
+// eased scroll for guided moves (e.g. click on the monitor in «Чому я»)
+let tweenId = 0;
+function tweenScroll(y, dur = 1600) {
+  const id = ++tweenId, y0 = scrollY, t0 = performance.now(); SS.run = false;
+  const st = () => {
+    if (id !== tweenId) return;
+    const k = clamp((performance.now() - t0) / dur), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    scrollTo(0, y0 + (y - y0) * e);
+    if (k < 1) requestAnimationFrame(st);
+  };
+  requestAnimationFrame(st);
+}
+addEventListener('wheel', () => { tweenId++; }, { passive: true });
 // jump with a cinematic camera flight instead of scrolling through every section
 const W = { t0: -1e9, dur: 1500 };
 function go(el) {
@@ -719,7 +732,7 @@ async function initScene() {
     mouse.px = e.clientX; mouse.py = e.clientY; mouse.has = !e.target.closest(UI);
   });
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-  const picks = Object.values(screens).map(sc => sc.scr); monV.userData.id = null; picks.push(monV);
+  const picks = Object.values(screens).map(sc => sc.scr); monV.userData.id = null; picks.push(monV, monBg);
   let hoverId = null;
   function pick(list = picks) {
     if (!mouse.has || mouse.px < 0) return null;
@@ -732,7 +745,9 @@ async function initScene() {
     if (e.target.closest(UI)) return;
     mouse.px = e.clientX; mouse.py = e.clientY; mouse.has = true;
     if (FOCUS.id) { if (pick([screens[FOCUS.id].scr])) vw.play.click(); else closeViewer(); return; }
-    const id = pick(); if (id) openViewer(id);
+    const id = pick();
+    if (id === '__why') { const el = $('#why .why-intro'); tweenScroll(el.getBoundingClientRect().top + scrollY - innerHeight * .28, 1900); return; }
+    if (id) openViewer(id);
   });
 
   const ambC = document.createElement('canvas'); ambC.width = 9; ambC.height = 16;
@@ -811,10 +826,10 @@ async function initScene() {
     else if (kind === 'niche') { const w = WORKS.find(w => w.niche === curNiche); vidFor = (w || FEAT[0]).id; vidTarget = monV; }
     else if (kind === 'hero' || kind === 'contact') { vidFor = FEAT[0].id; vidTarget = monV; }
     if (vidFor) wantVideo(vidFor); vidFor0 = vidFor;
-    monV.userData.id = kind === 'brief' ? null : (vidFor0 || FEAT[0].id);
+    monV.userData.id = monBg.userData.id = kind === 'why' && tp < .2 ? '__why' : kind === 'brief' || kind === 'why' || kind === 'proc' ? null : (vidFor0 || FEAT[0].id);
     hoverId = FOCUS.id ? null : pick();
     document.body.classList.toggle('pick', !!hoverId || (!!FOCUS.id && !!pick([screens[FOCUS.id].scr])));
-    if (hoverId) { hov.textContent = byId[hoverId].title; hov.style.transform = `translate(${mouse.px + 16}px,${mouse.py + 18}px)`; hov.classList.add('on'); }
+    if (hoverId) { hov.textContent = hoverId === '__why' ? 'Натисніть, щоб дізнатися більше ↓' : byId[hoverId].title; hov.style.transform = `translate(${mouse.px + 16}px,${mouse.py + 18}px)`; hov.classList.add('on'); }
     else hov.classList.remove('on');
 
     const vReady = vid.readyState >= 2 && !vid.paused;
