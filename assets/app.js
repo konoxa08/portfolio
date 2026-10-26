@@ -692,7 +692,7 @@ async function initScene() {
   function whyPose(tp) {
     const P = narrow(); let rr, h, th, ly;
     if (tp <= .55) { const q = 1 - Math.pow(1 - tp / .55, 2.2); rr = 3 + 12 * q; h = 2.6 + 8.4 * q; th = .75 * q; ly = 2.55 + 2.95 * q; }
-    else { const q = ease((tp - .55) / .45); rr = 15 + 2.5 * q; h = 11 + 3.5 * q; th = .75 + .2 * q; ly = 5.5 - 1 * q; }
+    else { const q = ease((tp - .55) / .45); rr = 15 + 4 * q; h = 11 + 6 * q; th = .75 + .25 * q; ly = 5.5 - 1.5 * q; }
     if (P) rr = rr * 1.3 + 2.5;
     return { p: V(A.x + rr * Math.sin(th), h, A.z + rr * Math.cos(th)), l: V(A.x, ly, A.z), f: P ? 55 : 38 };
   }
