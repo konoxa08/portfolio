@@ -391,3 +391,5 @@ body.scrolled .nav{background:linear-gradient(180deg,rgba(4,6,11,.82),rgba(4,6,1
 .rv.in{opacity:1;translate:0 0;filter:none}
 #gl{will-change:filter}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;translate:none;filter:none}}
+
+.cv video,.cv img{pointer-events:none}

@@ -176,12 +176,12 @@ function openCatalog() {
 }
 function closeCatalog() {
   catEl.classList.remove('on'); catEl.setAttribute('aria-hidden', 'true'); document.body.classList.remove('cat');
-  catGrid.querySelectorAll('video').forEach(v => v.remove()); lockScroll(false);
+  setTimeout(() => catGrid.querySelectorAll('video').forEach(v => v.remove()), 350); lockScroll(false);
 }
 $('#cat-x').onclick = closeCatalog;
 catEl.addEventListener('click', e => {
   const c = e.target.closest('.card');
-  if (c) { closeCatalog(); catReturn = true; openWork(c.dataset.cid); return; }
+  if (c) { e.stopPropagation(); const rect = c.querySelector('.cv').getBoundingClientRect(); closeCatalog(); catReturn = true; openWork(c.dataset.cid, rect); return; }
   if (e.target === catEl || e.target.classList.contains('cat-in')) closeCatalog();
 });
 addEventListener('keydown', e => { if (e.key === 'Escape' && catEl.classList.contains('on')) closeCatalog(); });
@@ -650,9 +650,19 @@ async function initScene() {
   const FOCUS = { id: null, sound: true };
   const vw = { k: $('#vk'), t: $('#vt'), d: $('#vd'), n: $('#vn'), fill: $('#vfill'), time: $('#vtime'), play: $('#vplay'), snd: $('#vsnd') };
   const fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
-  function openViewer(id) {
+  function openViewer(id, rect) {
     if (!screens[id]) return openDialog(id);
-    const w = byId[id];
+    const w = byId[id], sc0 = screens[id];
+    sc0.from = null;
+    if (rect && rect.width) { // start the 3D card exactly where the thumbnail was, then fly it to the viewer
+      cam.updateMatrixWorld();
+      const nx = (rect.left + rect.width / 2) / innerWidth * 2 - 1, ny = -((rect.top + rect.height / 2) / innerHeight) * 2 + 1;
+      const dir = new THREE.Vector3(nx, ny, .5).unproject(cam).sub(cam.position).normalize();
+      const fw = new THREE.Vector3(); cam.getWorldDirection(fw);
+      const visH0 = 2 * FD * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+      sc0.from = { p: cam.position.clone().addScaledVector(dir, FD / dir.dot(fw)), q: cam.quaternion.clone(), s: rect.height / innerHeight * visH0 / 1.806 };
+      sc0.ft = 0;
+    }
     FOCUS.id = id; document.body.classList.add('focus'); lockScroll(true);
     vidId = id; vid.src = `media/${id}.mp4`; vid.muted = !FOCUS.sound; vid.currentTime = 0; vid.play().catch(() => {});
     vw.k.textContent = `${NICHE[w.niche]} · ${w.style}`; vw.t.textContent = w.title; vw.d.textContent = w.desc;
@@ -763,7 +773,7 @@ async function initScene() {
   const railBtns = $$('#rail button'), caps = $$('.chap .cap');
   // pointer: parallax, hover, click
   const mouse = { x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, has: false };
-  const UI = 'a,button,input,select,label,textarea,.glass,.cap,dialog,.nav,.ct,.hero-in,.rail,.vw-bar,.vw-info,.vw-x,#home';
+  const UI = 'a,button,input,select,label,textarea,.glass,.cap,dialog,.nav,.ct,.hero-in,.rail,.vw-bar,.vw-info,.vw-x,#home,#catalog';
   const hov = document.createElement('div'); hov.className = 'hov'; document.body.append(hov);
   addEventListener('pointermove', e => {
     if (e.pointerType === 'mouse') { mouse.tx = e.clientX / innerWidth * 2 - 1; mouse.ty = e.clientY / innerHeight * 2 - 1; }
@@ -905,9 +915,10 @@ async function initScene() {
       }
       if (sc.ft > 0) {
         const e = ease(sc.ft);
-        sc.grp.position.lerpVectors(hp, fp, e).addScaledVector(up, Math.sin(e * Math.PI) * .35);
-        sc.grp.quaternion.slerpQuaternions(rq, fq, e);
-        sc.grp.scale.setScalar((1 + (FS - 1) * e) * sc.hs);
+        const F = FOCUS.id === id ? sc.from : null; if (FOCUS.id !== id) sc.from = null;
+        sc.grp.position.lerpVectors(F ? F.p : hp, fp, e); if (!F) sc.grp.position.addScaledVector(up, Math.sin(e * Math.PI) * .35);
+        sc.grp.quaternion.slerpQuaternions(F ? F.q : rq, fq, e);
+        sc.grp.scale.setScalar(((F ? F.s : 1) + (FS - (F ? F.s : 1)) * e) * sc.hs);
         sc.grp.renderOrder = 2;
       } else { sc.grp.position.copy(hp); sc.grp.quaternion.copy(rq); sc.grp.scale.setScalar(sc.hs * (orb > .001 && orb < .999 ? Math.abs(1 - 2 * ease(orb)) : 1)); }
     }
