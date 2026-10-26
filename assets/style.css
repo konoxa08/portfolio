@@ -186,3 +186,12 @@ body.nogl .cap{position:static}
   *{animation:none!important;transition:none!important}
 }
 .bars i:nth-child(1){height:5px}.bars i:nth-child(2){height:9px}.bars i:nth-child(3){height:6px}.bars i:nth-child(4){height:11px}
+.hov{position:fixed;left:0;top:0;z-index:40;pointer-events:none;padding:8px 14px;border-radius:12px;font-size:13px;font-weight:600;background:rgba(10,16,28,.75);border:1px solid rgba(63,214,255,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;transition:opacity .2s;white-space:nowrap}
+.hov.on{opacity:1}
+body.pick{cursor:pointer}
+.scroll-hint{position:absolute;right:0;bottom:28px;display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.scroll-hint i{width:22px;height:34px;border:1.5px solid rgba(255,255,255,.4);border-radius:12px;position:relative}
+.scroll-hint i:after{content:'';position:absolute;left:50%;top:7px;width:3px;height:7px;background:var(--cyan);border-radius:2px;transform:translateX(-50%);animation:wheel 1.6s ease-in-out infinite}
+@keyframes wheel{60%{transform:translate(-50%,9px);opacity:0}}
+@media (max-width:760px){.scroll-hint{display:none}}
+.nav,.rail{z-index:20}

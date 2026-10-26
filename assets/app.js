@@ -78,6 +78,14 @@ $('#bform').addEventListener('submit', e => {
   window.open(tgUrl, '_blank', 'noopener');
 });
 
+// in-page links: scroll by script so they work inside embedded viewers too
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#"]'); if (!a) return;
+  const el = document.querySelector(a.getAttribute('href')); if (!el) return;
+  e.preventDefault();
+  scrollTo({ top: el.getBoundingClientRect().top + scrollY, behavior: reduced ? 'auto' : 'smooth' });
+});
+
 // copy + toast
 const toast = $('#toast'); let toastT;
 function say(msg) { toast.textContent = msg; toast.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove('on'), 2600); }
@@ -403,10 +411,34 @@ async function initScene() {
   new ResizeObserver(measure).observe(document.body);
 
   // adaptive quality
-  let slow = 0, last = performance.now(), degraded = false;
+  let slow = 0, last = performance.now(), degraded = false, vidFor0 = null;
   function degrade() { degraded = true; dpr = 1; r.setPixelRatio(1); comp.setPixelRatio(1); bloom.strength = .6; if (reflector) reflector.visible = false; }
 
   const railBtns = $$('#rail button'), caps = $$('.chap .cap');
+  // pointer: camera parallax + clickable screens
+  const mouse = { x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, has: false };
+  const UI = 'a,button,input,select,label,textarea,.glass,.cap,dialog,.nav,.ct,.hero-in,.rail';
+  const hov = document.createElement('div'); hov.className = 'hov'; document.body.append(hov);
+  addEventListener('pointermove', e => {
+    if (e.pointerType === 'mouse') { mouse.tx = e.clientX / innerWidth * 2 - 1; mouse.ty = e.clientY / innerHeight * 2 - 1; }
+    mouse.px = e.clientX; mouse.py = e.clientY; mouse.has = !e.target.closest(UI);
+  });
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const picks = Object.entries(screens).map(([id, sc]) => { sc.scr.userData.id = id; return sc.scr; });
+  monV.userData.id = null; picks.push(monV);
+  let hoverId = null;
+  function pick() {
+    if (!mouse.has || mouse.px < 0) return null;
+    ndc.set(mouse.px / innerWidth * 2 - 1, -(mouse.py / innerHeight) * 2 + 1);
+    ray.setFromCamera(ndc, cam);
+    const h = ray.intersectObjects(picks, false)[0];
+    return h ? h.object.userData.id : null;
+  }
+  document.addEventListener('click', e => {
+    if (e.target.closest(UI)) return;
+    mouse.px = e.clientX; mouse.py = e.clientY; mouse.has = true;
+    const id = pick(); if (id) openPlayer(id);
+  });
   let started = false;
   function frame(now) {
     const dt = Math.min(.1, (now - last) / 1000); last = now;
@@ -425,14 +457,23 @@ async function initScene() {
     // camera
     const a = reduced ? 1 : 1 - Math.exp(-dt * 4.5);
     camP.lerp(tP, a); camL.lerp(tL, a); camF += (st.f - camF) * a;
-    cam.position.copy(camP); cam.fov = camF; cam.updateProjectionMatrix(); cam.lookAt(camL);
+    mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 2.5); mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 2.5);
+    const amp = reduced ? 0 : kind === 'work' ? .35 : kind === 'brief' ? .3 : .8;
+    const fwd = tL.clone().sub(camP).normalize(), rt = fwd.clone().cross(cam.up).normalize();
+    cam.position.copy(camP).addScaledVector(rt, mouse.x * amp).addScaledVector(cam.up, -mouse.y * amp * .5);
+    cam.fov = camF; cam.updateProjectionMatrix(); cam.lookAt(camL);
+    monV.userData.id = kind === 'brief' ? null : (vidFor0 || FEAT[0].id);
+    hoverId = pick();
+    document.body.classList.toggle('pick', !!hoverId);
+    if (hoverId) { const w = byId[hoverId]; hov.textContent = w.title; hov.style.transform = `translate(${mouse.px + 16}px,${mouse.py + 18}px)`; hov.classList.add('on'); }
+    else hov.classList.remove('on');
 
     // what plays where
     let vidTarget = null, vidFor = null;
     if (kind === 'work') { vidFor = FEAT[near - 1].id; vidTarget = screens[vidFor].scr; }
     else if (kind === 'niche') { vidFor = WORKS.find(w => w.niche === curNiche).id; vidTarget = monV; }
     else if (kind === 'hero' || kind === 'contact') { vidFor = FEAT[0].id; vidTarget = monV; }
-    if (vidFor) wantVideo(vidFor);
+    if (vidFor) wantVideo(vidFor); vidFor0 = vidFor;
     const vReady = vid.readyState >= 2 && !vid.paused;
     for (const [id, sc] of Object.entries(screens)) {
       const on = vidTarget === sc.scr;
@@ -442,8 +483,9 @@ async function initScene() {
       sc.lvl += (want - sc.lvl) * Math.min(1, dt * 5);
       const c = sc.lvl * (on ? 1 : sc.dim);
       sc.scr.material.color.setRGB(c, c, c);
-      sc.rimM.color.setHex(0x3fd6ff).multiplyScalar((on ? 1.5 + Math.sin(now / 300) * .2 : 1.3) * (.35 + .65 * sc.lvl));
+      sc.rimM.color.setHex(0x3fd6ff).multiplyScalar((on ? 1.5 + Math.sin(now / 300) * .2 : hoverId === id ? 2.2 : 1.3) * (.35 + .65 * sc.lvl));
       if (!reduced) sc.grp.position.y = sc.base + Math.sin(now / 1400 + sc.phase) * .05;
+      const hs = hoverId === id ? 1.06 : 1; sc.grp.scale.setScalar(sc.grp.scale.x + (hs - sc.grp.scale.x) * Math.min(1, dt * 8));
     }
     let mm;
     if (kind === 'brief') { drawGen(now); genT.needsUpdate = true; mm = genT; }
