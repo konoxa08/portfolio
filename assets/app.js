@@ -575,6 +575,31 @@ async function initScene() {
 
   wall.material.transparent = true; slats.material.transparent = true; NEONS.forEach(m => m.material.transparent = true);
   const LIGHT = new THREE.Color(.86, .93, .96);
+  const rings2 = [];
+  // «Чому я»: the room dissolves into a dark void with a round stage, like a keynote product shot
+  const stage = new THREE.Group(); stage.position.set(0.6, 0, -2.2); stage.visible = false; s.add(stage);
+  const stageMs = [];
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.5, .16, 128), new THREE.MeshStandardMaterial({ color: 0x0a0e15, metalness: .85, roughness: .28, transparent: true, opacity: 0 }));
+  disc.position.y = .08; stage.add(disc); stageMs.push(disc);
+  const edgeM2 = new THREE.MeshBasicMaterial({ color: 0x3fd6ff, transparent: true, opacity: 0, toneMapped: false });
+  const edge2 = new THREE.Mesh(new THREE.TorusGeometry(3.405, .012, 8, 200), edgeM2); edge2.rotation.x = Math.PI / 2; edge2.position.y = .162; stage.add(edge2); stageMs.push(edge2);
+  const poolC = document.createElement('canvas'); poolC.width = poolC.height = 128;
+  { const x = poolC.getContext('2d'), g2 = x.createRadialGradient(64, 64, 0, 64, 64, 64); g2.addColorStop(0, 'rgba(255,255,255,.55)'); g2.addColorStop(.5, 'rgba(255,255,255,.12)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g2; x.fillRect(0, 0, 128, 128); }
+  const poolM = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(poolC), color: 0x3fd6ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(13, 13), poolM); pool.rotation.x = -Math.PI / 2; pool.position.y = .02; stage.add(pool); pool.userData.o = .5; stageMs.push(pool);
+  // outer orbit ring on the floor with a travelling arc of light
+  const ringM = new THREE.ShaderMaterial({
+    uniforms: { t: { value: 0 }, col: { value: new THREE.Color(0x3fd6ff) }, op: { value: 0 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, side: THREE.DoubleSide,
+    vertexShader: 'varying vec2 vU; void main(){ vU = vec2(atan(position.y, position.x) / 6.2831853 + .5, 0.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float t; uniform vec3 col; uniform float op; varying vec2 vU;
+      void main(){ float d = fract(t - vU.x); float a = .12 + exp(-d * 6.0) * .9 + exp(-fract(t + .5 - vU.x) * 6.0) * .5;
+        gl_FragColor = vec4(col * (1.0 + 3.0 * exp(-d * 60.0)), a * op); }`,
+  });
+  for (const [rr2, w2, sp2] of [[5.2, .022, 1], [7.4, .014, -1]]) {
+    const rg = new THREE.Mesh(new THREE.RingGeometry(rr2 - w2, rr2 + w2, 256, 1), ringM.clone());
+    rg.rotation.x = -Math.PI / 2; rg.position.y = .03; rg.userData.sp = sp2; stage.add(rg); rings2.push(rg);
+  }
   let hazeAt = 0;
   // the light beam (axis of the pull-back scene)
   const beamG = new THREE.Group(); beamG.position.set(0.6, 3.63, -2.75); s.add(beamG);
@@ -720,7 +745,7 @@ async function initScene() {
   new ResizeObserver(measure).observe(document.body);
 
   // adaptive quality
-  let slow = 0, last = performance.now(), degraded = false, vidFor0 = null, orb = 0, beam = 0;
+  let slow = 0, last = performance.now(), degraded = false, vidFor0 = null, orb = 0, beam = 0, rf = 0;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
   const hazeEl = $('#haze');
   // quality tiers from measured frame time
@@ -800,6 +825,7 @@ async function initScene() {
     const tp = kind === 'why' ? (st.tp ?? 0) : kind === 'proc' ? 1 : 0;
     const orbT = kind === 'why' ? smooth(.03, .3, tp) : kind === 'proc' ? 1 : 0;
     orb += (orbT - orb) * Math.min(1, dt * 3);
+    rf += ((kind === 'why' ? smooth(0, .09, tp) : kind === 'proc' ? 1 : 0) - rf) * Math.min(1, dt * 4);
     beam += ((kind === 'why' ? smooth(0, .05, tp) : kind === 'proc' ? 1 : 0) - beam) * Math.min(1, dt * 3);
     // one uniform light veil, driven by where the light section is (not by the camera), so no seam appears
     const pr = procEl.getBoundingClientRect();
@@ -901,7 +927,11 @@ async function initScene() {
     for (const [id, sc] of Object.entries(screens)) if (id !== vidFor) sc.haloM.color.lerp(CY, Math.min(1, dt * 2));
     s.background.setRGB(.012 + amb.r * .018, .02 + amb.g * .018, .04 + amb.b * .02);
     s.background.lerp(LIGHT, hz * .6); s.fog.color.copy(s.background); s.fog.density = .04 + .05 * hz;
-    const ro = 1 - orb;
+    const ro = 1 - rf;
+    stage.visible = rf > .005;
+    stageMs.forEach(m => m.material.opacity = rf * (m.userData.o ?? 1));
+    rings2.forEach((rg, i) => { const u = rg.material.uniforms; u.t.value = rg.userData.sp * now / (7000 + i * 4000); u.col.value.copy(amb); u.op.value = rf * (i ? .6 : 1); });
+    edgeM2.color.copy(amb).multiplyScalar(2.2); poolM.color.copy(amb);
     wall.material.opacity = ro; slats.material.opacity = ro; NEONS.forEach(m => m.material.opacity = ro);
     wall.visible = slats.visible = ro > .01; NEONS.forEach(m => m.visible = ro > .01);
     beamG.visible = beam > .005; coreM.opacity = beam; glowM.opacity = beam * .5; glowM.color.copy(amb);
@@ -920,8 +950,8 @@ async function initScene() {
     if (!reduced) dust.rotation.y = now / 90000;
     trailM.uniforms.t.value = reduced ? .3 : now / 16000; trailM.uniforms.col.value.copy(amb); trailM.uniforms.op.value = (1 - focusAmt * .8) * (1 - orb * .7);
     for (let i = 0; i < NS - 1; i++) {
-      const x = i / (NS - 1), w = Math.pow(Math.max(0, Math.sin(x * 9 - now / 900)), 10) + .6 * Math.pow(Math.max(0, Math.sin(x * 5 + now / 1500 + 1.3)), 14);
-      ledC.copy(amb).multiplyScalar((.05 + w * 1.6) * ro); leds.setColorAt(i, ledC);
+      const x = i / (NS - 1), w = Math.pow(Math.max(0, Math.sin(x * 6 - now / 1100)), 24);
+      ledC.copy(amb).multiplyScalar((.015 + w * .9) * ro); leds.setColorAt(i, ledC);
     }
     leds.instanceColor.needsUpdate = true; leds.visible = ro > .01 && tier < 2;
 
