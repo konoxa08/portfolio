@@ -589,12 +589,12 @@ async function initScene() {
   const pool = new THREE.Mesh(new THREE.PlaneGeometry(13, 13), poolM); pool.rotation.x = -Math.PI / 2; pool.position.y = .02; stage.add(pool); pool.userData.o = .5; stageMs.push(pool);
   // outer orbit ring on the floor with a travelling arc of light
   const ringM = new THREE.ShaderMaterial({
-    uniforms: { t: { value: 0 }, col: { value: new THREE.Color(0x3fd6ff) }, op: { value: 0 } },
+    uniforms: { t: { value: 0 }, col: { value: new THREE.Color(0x3fd6ff) }, op: { value: 0 }, rev: { value: 0 } },
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, side: THREE.DoubleSide,
     vertexShader: 'varying vec2 vU; void main(){ vU = vec2(atan(position.y, position.x) / 6.2831853 + .5, 0.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform float t; uniform vec3 col; uniform float op; varying vec2 vU;
-      void main(){ float d = fract(t - vU.x); float a = .12 + exp(-d * 6.0) * .9 + exp(-fract(t + .5 - vU.x) * 6.0) * .5;
-        gl_FragColor = vec4(col * (1.0 + 3.0 * exp(-d * 60.0)), a * op); }`,
+    fragmentShader: `uniform float t; uniform vec3 col; uniform float op; uniform float rev; varying vec2 vU;
+      void main(){ float g = fract(vU.x + .25); float drawn = smoothstep(rev, rev - .04, g); if (drawn <= 0.0) discard; float d = fract(t - vU.x); float a = .12 + exp(-d * 6.0) * .9 + exp(-fract(t + .5 - vU.x) * 6.0) * .5;
+        gl_FragColor = vec4(col * (1.0 + 3.0 * exp(-d * 60.0)), a * op * drawn); }`,
   });
   for (const [rr2, w2, sp2] of [[5.2, .022, 1], [7.4, .014, -1]]) {
     const rg = new THREE.Mesh(new THREE.RingGeometry(rr2 - w2, rr2 + w2, 256, 1), ringM.clone());
@@ -825,7 +825,7 @@ async function initScene() {
     const tp = kind === 'why' ? (st.tp ?? 0) : kind === 'proc' ? 1 : 0;
     const orbT = kind === 'why' ? smooth(.03, .3, tp) : kind === 'proc' ? 1 : 0;
     orb += (orbT - orb) * Math.min(1, dt * 3);
-    rf += ((kind === 'why' ? smooth(0, .09, tp) : kind === 'proc' ? 1 : 0) - rf) * Math.min(1, dt * 4);
+    rf += ((kind === 'why' ? smooth(.0, .32, tp) : kind === 'proc' ? 1 : 0) - rf) * Math.min(1, dt * 1.6);
     beam += ((kind === 'why' ? smooth(0, .05, tp) : kind === 'proc' ? 1 : 0) - beam) * Math.min(1, dt * 3);
     // one uniform light veil, driven by where the light section is (not by the camera), so no seam appears
     const pr = procEl.getBoundingClientRect();
@@ -929,8 +929,9 @@ async function initScene() {
     s.background.lerp(LIGHT, hz * .6); s.fog.color.copy(s.background); s.fog.density = .04 + .05 * hz;
     const ro = 1 - rf;
     stage.visible = rf > .005;
-    stageMs.forEach(m => m.material.opacity = rf * (m.userData.o ?? 1));
-    rings2.forEach((rg, i) => { const u = rg.material.uniforms; u.t.value = rg.userData.sp * now / (7000 + i * 4000); u.col.value.copy(amb); u.op.value = rf * (i ? .6 : 1); });
+    stageMs.forEach(m => m.material.opacity = smooth(.2, 1, rf) * (m.userData.o ?? 1));
+    stage.position.y = -.25 * (1 - smooth(.2, 1, rf));
+    rings2.forEach((rg, i) => { const u = rg.material.uniforms; u.t.value = rg.userData.sp * now / (7000 + i * 4000); u.col.value.copy(amb); u.op.value = Math.min(1, rf * 1.6) * (i ? .6 : 1); u.rev.value = smooth(.15 + i * .15, .9 + i * .1, rf); });
     edgeM2.color.copy(amb).multiplyScalar(2.2); poolM.color.copy(amb);
     wall.material.opacity = ro; slats.material.opacity = ro; NEONS.forEach(m => m.material.opacity = ro);
     wall.visible = slats.visible = ro > .01; NEONS.forEach(m => m.visible = ro > .01);
