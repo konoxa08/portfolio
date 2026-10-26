@@ -17,7 +17,7 @@ const BN = Object.fromEntries(data.briefNiches.map(n => [n.id, n]));
 /* ---------------- scroll ---------------- */
 // native scrolling; the camera itself is damped, so motion stays smooth
 // light smooth-wheel; falls back to native scrolling if the page can't move itself
-const SS = { on: matchMedia('(pointer: fine)').matches && !reduced, tgt: 0, cur: 0, run: false, ok: false };
+const SS = { on: false, can: matchMedia('(pointer: fine)').matches && !reduced, tgt: 0, cur: 0, run: false, ok: false };
 const ssStep = () => {
   SS.cur += (SS.tgt - SS.cur) * .1;
   if (Math.abs(SS.tgt - SS.cur) < .5) { SS.cur = SS.tgt; SS.run = false; }
@@ -222,8 +222,16 @@ snd.onclick = () => {
 
 // home button visibility + active nav link
 const homeBtn = $('#home'), navLinks = $$('.links a');
+const heroIn = $('.hero-in'), heroLow = $$('.strip,.scroll-hint');
 function onScroll() {
   homeBtn.classList.toggle('on', scrollY > innerHeight * .6);
+  document.body.classList.toggle('scrolled', scrollY > 24);
+  // the hero dissolves upward instead of sliding under the logo
+  const hp = clamp(scrollY / (innerHeight * .5));
+  heroIn.style.opacity = (1 - hp).toFixed(3);
+  heroIn.style.transform = hp ? `translate3d(0,${(-hp * 70).toFixed(1)}px,0) scale(${(1 - hp * .05).toFixed(4)})` : '';
+  heroIn.style.filter = hp > .01 ? `blur(${(hp * 8).toFixed(1)}px)` : '';
+  heroLow.forEach(e => e.style.opacity = (1 - clamp(hp * 3)).toFixed(3));
   const mid = scrollY + innerHeight * .5;
   let act = null;
   for (const a of navLinks) { const el = $(a.getAttribute('href')); if (el && el.getBoundingClientRect().top + scrollY <= mid) act = a; }
@@ -400,7 +408,7 @@ async function initScene() {
   const lowEnd = matchMedia('(max-width: 760px)').matches || (navigator.hardwareConcurrency || 8) <= 4;
   const r = new THREE.WebGLRenderer({ canvas, antialias: !lowEnd, powerPreference: 'high-performance' });
   if (!r.getContext()) throw new Error('no webgl');
-  let dpr = Math.min(devicePixelRatio, lowEnd ? 1.5 : 2);
+  let dpr = Math.min(devicePixelRatio, 1.5);
   r.setPixelRatio(dpr); r.setSize(innerWidth, innerHeight, false);
   r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.3;
   const s = new THREE.Scene(); s.background = new THREE.Color(0x03050a); s.fog = new THREE.FogExp2(0x03050a, .04);
@@ -414,7 +422,7 @@ async function initScene() {
   // floor
   let reflector = null;
   if (!lowEnd) {
-    reflector = new Reflector(new THREE.PlaneGeometry(60, 60), { textureWidth: innerWidth * Math.min(dpr, 1.5) * .7, textureHeight: innerHeight * Math.min(dpr, 1.5) * .7, color: 0x1a2029 });
+    reflector = new Reflector(new THREE.PlaneGeometry(60, 60), { textureWidth: innerWidth * .5, textureHeight: innerHeight * .5, color: 0x1a2029 });
     reflector.rotation.x = -Math.PI / 2; s.add(reflector);
   }
   const fl2 = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x05070c, roughness: lowEnd ? .35 : .55, metalness: lowEnd ? .6 : .2, transparent: !lowEnd, opacity: .9 }));
@@ -572,7 +580,8 @@ async function initScene() {
   comp.addPass(new RenderPass(s, cam));
   const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .85, .6, .62);
   comp.addPass(bloom); comp.addPass(new OutputPass());
-  comp.setPixelRatio(dpr); comp.setSize(innerWidth, innerHeight);
+  const bloomRes = () => bloom.setSize(innerWidth * dpr * .5, innerHeight * dpr * .5);
+  comp.setPixelRatio(dpr); comp.setSize(innerWidth, innerHeight); bloomRes();
 
   // video
   const vid = document.createElement('video');
@@ -681,7 +690,7 @@ async function initScene() {
   }
 
   addEventListener('resize', () => {
-    r.setSize(innerWidth, innerHeight, false); comp.setSize(innerWidth, innerHeight);
+    r.setSize(innerWidth, innerHeight, false); comp.setSize(innerWidth, innerHeight); bloomRes();
     cam.aspect = innerWidth / innerHeight; buildKeys(); measure();
   });
   new ResizeObserver(measure).observe(document.body);
@@ -690,7 +699,15 @@ async function initScene() {
   let slow = 0, last = performance.now(), degraded = false, vidFor0 = null, orb = 0, beam = 0;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
   const hazeEl = $('#haze');
-  function degrade() { degraded = true; dpr = Math.max(1, Math.min(dpr, 1.25)); r.setPixelRatio(dpr); comp.setPixelRatio(dpr); }
+  // quality tiers from measured frame time
+  let tier = 0;
+  function degrade() {
+    tier++; degraded = tier >= 3;
+    if (tier === 1) { dpr = 1; r.setPixelRatio(1); comp.setPixelRatio(1); comp.setSize(innerWidth, innerHeight); bloomRes(); }
+    if (tier === 2) { if (reflector) reflector.visible = false; leds.visible = false; }
+    if (tier === 3) { bloom.enabled = false; }
+  }
+  const ft = [];
 
   const railBtns = $$('#rail button'), caps = $$('.chap .cap');
   // pointer: parallax, hover, click
@@ -741,7 +758,14 @@ async function initScene() {
   let started = false;
   function frame(now) {
     const dt = Math.min(.1, (now - last) / 1000); last = now;
-    if (started && !degraded && !window.__noDegrade) { slow = dt > .055 ? slow + dt : Math.max(0, slow - dt * .5); if (slow > 4) degrade(); }
+    if (started && !window.__noDegrade) {
+      ft.push(dt); if (ft.length > 45) ft.shift();
+      if (ft.length === 45) {
+        const avg = ft.reduce((a, b) => a + b, 0) / 45;
+        if (avg > .024 && !degraded) { degrade(); ft.length = 0; }
+        SS.on = SS.can && avg < .021; // smooth wheel only when frames are fast
+      }
+    }
     const st = target();
     const near = st.e < .5 ? st.k : st.k + 1;
     const nF = FEAT.length;
@@ -868,7 +892,7 @@ async function initScene() {
       const x = i / (NS - 1), w = Math.pow(Math.max(0, Math.sin(x * 9 - now / 900)), 10) + .6 * Math.pow(Math.max(0, Math.sin(x * 5 + now / 1500 + 1.3)), 14);
       ledC.copy(amb).multiplyScalar((.05 + w * 1.6) * ro); leds.setColorAt(i, ledC);
     }
-    leds.instanceColor.needsUpdate = true; leds.visible = ro > .01;
+    leds.instanceColor.needsUpdate = true; leds.visible = ro > .01 && tier < 2;
 
     if (FOCUS.id) {
       const d = vid.duration || 0;
