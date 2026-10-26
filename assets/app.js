@@ -507,7 +507,9 @@ async function initScene() {
   { const x = mbC.getContext('2d'); const gr = x.createRadialGradient(256, 160, 10, 256, 160, 300); gr.addColorStop(0, '#0c2a40'); gr.addColorStop(1, '#03060c'); x.fillStyle = gr; x.fillRect(0, 0, 512, 288); }
   const mbT = new THREE.CanvasTexture(mbC); mbT.colorSpace = THREE.SRGBColorSpace;
   const monBg = new THREE.Mesh(new THREE.PlaneGeometry(3.56, 2), new THREE.MeshBasicMaterial({ map: mbT, toneMapped: false })); monBg.position.z = .042; mon.add(monBg);
-  const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2), new THREE.MeshBasicMaterial({ color: 0x3fd6ff, transparent: true, opacity: .16, blending: THREE.AdditiveBlending, depthWrite: false })); glow.position.z = .044; mon.add(glow);
+  const mgC = document.createElement('canvas'); mgC.width = 256; mgC.height = 144;
+  { const x = mgC.getContext('2d'), g2 = x.createRadialGradient(128, 72, 4, 128, 72, 120); g2.addColorStop(0, 'rgba(255,255,255,.9)'); g2.addColorStop(.45, 'rgba(255,255,255,.25)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g2; x.fillRect(0, 0, 256, 144); }
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(3.56, 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(mgC), color: 0x3fd6ff, transparent: true, opacity: .16, blending: THREE.AdditiveBlending, depthWrite: false })); glow.position.z = .044; mon.add(glow);
   const genT = new THREE.CanvasTexture(G); genT.colorSpace = THREE.SRGBColorSpace;
   const monV = new THREE.Mesh(new THREE.PlaneGeometry(1.125, 2), new THREE.MeshBasicMaterial({ toneMapped: false, color: new THREE.Color(.95, .95, .95) })); monV.position.z = .047; mon.add(monV);
 
