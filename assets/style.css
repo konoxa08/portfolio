@@ -292,3 +292,11 @@ body.cat .links a[href="#works"]{color:var(--fg)}
 .insha .b1,.insha .b2{padding:13px 20px;font-size:14px}
 
 [hidden]{display:none!important}
+
+/* wordmark */
+.logo{display:grid;gap:5px;line-height:1;letter-spacing:0}
+.logo b,.ld-mark b{font-family:'Michroma',var(--display);font-weight:400;font-size:19px;letter-spacing:.32em;color:var(--fg);margin-right:-.32em}
+.logo small,.ld-mark small{font-family:'Michroma',var(--display);font-size:8px;letter-spacing:.62em;color:var(--cyan);text-shadow:0 0 10px rgba(63,214,255,.55)}
+.ld-mark{width:auto;height:auto;border-radius:0;background:none;box-shadow:none;display:grid;gap:8px;justify-items:start}
+.ld-mark b{font-size:30px}.ld-mark small{font-size:11px}
+@media (max-width:420px){.logo b{font-size:15px;letter-spacing:.26em}.logo small{font-size:6.5px;letter-spacing:.5em}}
