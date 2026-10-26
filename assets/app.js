@@ -482,7 +482,7 @@ async function initScene() {
     scr.position.z = .003; scr.userData.id = w.id; grp.add(scr);
     s.add(grp);
     screens[w.id] = { grp, scr, haloM, poster, pos, n: new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)), lx: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)),
-      homeQ: grp.quaternion.clone(), dim, base: pos.y, phase: i * 1.7, lvl: 1, ft: 0, hs: 1 };
+      homeQ: grp.quaternion.clone(), idx: i, dim, base: pos.y, phase: i * 1.7, lvl: 1, ft: 0, hs: 1 };
   });
   monV.material.map = screens[FEAT[0].id].poster;
 
@@ -499,6 +499,32 @@ async function initScene() {
   { const x = dotC.getContext('2d'), gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.4, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 32, 32); }
   const dust = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x9fe9ff, size: .06, map: new THREE.CanvasTexture(dotC), transparent: true, opacity: .32, depthWrite: false, blending: THREE.AdditiveBlending }));
   s.add(dust);
+
+  wall.material.transparent = true; slats.material.transparent = true; NEONS.forEach(m => m.material.transparent = true);
+  const LIGHT = new THREE.Color(.86, .93, .96);
+  let hazeAt = 0;
+  // the light beam (axis of the pull-back scene)
+  const beamG = new THREE.Group(); beamG.position.set(0.6, 3.63, -2.75); s.add(beamG);
+  const coreM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xbff3ff).multiplyScalar(2.2), transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+  beamG.add(new THREE.Mesh(new THREE.CylinderGeometry(.016, .016, 40, 8).translate(0, 20, 0), coreM));
+  const bmC = document.createElement('canvas'); bmC.width = 64; bmC.height = 256;
+  { const x = bmC.getContext('2d'); for (let yy = 0; yy < 256; yy++) { const g2 = x.createLinearGradient(0, 0, 64, 0), a = Math.pow(yy / 256, 1.6);
+      g2.addColorStop(0, 'rgba(255,255,255,0)'); g2.addColorStop(.5, `rgba(255,255,255,${a})`); g2.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g2; x.fillRect(0, yy, 64, 1); } }
+  const glowM = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bmC), color: 0x3fd6ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+  for (const ry of [0, Math.PI / 2]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 40).translate(0, 20, 0), glowM); m.rotation.y = ry; beamG.add(m); }
+  beamG.visible = false;
+  // wordmark on the monitor for the pull-back
+  const logoC = document.createElement('canvas'); logoC.width = 1024; logoC.height = 576;
+  const logoT = new THREE.CanvasTexture(logoC); logoT.colorSpace = THREE.SRGBColorSpace;
+  const drawLogo = () => {
+    const x = logoC.getContext('2d'), gr = x.createRadialGradient(512, 300, 10, 512, 300, 560);
+    gr.addColorStop(0, '#0e3350'); gr.addColorStop(1, '#03060c'); x.fillStyle = gr; x.fillRect(0, 0, 1024, 576);
+    x.textAlign = 'center'; x.fillStyle = '#fff'; x.font = '400 84px Michroma, sans-serif'; x.letterSpacing = '26px';
+    x.shadowColor = 'rgba(120,220,255,.6)'; x.shadowBlur = 24; x.fillText('KONOXA', 512 + 13, 300);
+    x.font = '400 24px Michroma, sans-serif'; x.letterSpacing = '14px'; x.fillStyle = '#3fd6ff'; x.shadowColor = '#3fd6ff'; x.shadowBlur = 16;
+    x.fillText('MOTION STUDIO', 512 + 7, 360); logoT.needsUpdate = true;
+  };
+  drawLogo(); document.fonts.load('40px Michroma').then(drawLogo).catch(() => {});
 
   // post
   const comp = new EffectComposer(r, new THREE.WebGLRenderTarget(innerWidth * dpr, innerHeight * dpr, { type: THREE.HalfFloatType, samples: lowEnd ? 2 : 4 }));
@@ -562,6 +588,15 @@ async function initScene() {
   // camera keys, one per scroll section
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   let K = [];
+  // pull-back path around the light beam that rises from the monitor
+  const A = V(0.6, 0, -2.75);
+  function whyPose(tp) {
+    const P = narrow(); let rr, h, th, ly;
+    if (tp <= .55) { const q = 1 - Math.pow(1 - tp / .55, 2.2); rr = 3 + 12 * q; h = 2.6 + 8.4 * q; th = .75 * q; ly = 2.55 + 2.95 * q; }
+    else { const q = ease((tp - .55) / .45); rr = 15 + 4 * q; h = 11 + 6 * q; th = .75 + .25 * q; ly = 5.5 - 1.5 * q; }
+    if (P) rr = rr * 1.3 + 2.5;
+    return { p: V(A.x + rr * Math.sin(th), h, A.z + rr * Math.cos(th)), l: V(A.x, ly, A.z), f: P ? 55 : 38 };
+  }
   function buildKeys() {
     const P = narrow(); K = [];
     K.push(P ? { p: V(0.6, 2.7, 15), l: V(0.6, 3.3, 0), f: 55 } : { p: V(-2.4, 2.2, 11), l: V(1.6, 2.4, 0), f: 38 });
@@ -570,14 +605,20 @@ async function initScene() {
       if (P) K.push({ p: sc.pos.clone().addScaledVector(sc.n, 4.3).add(V(0, -.7, 0)), l: sc.pos.clone().add(V(0, -.7, 0)), f: 52 });
       else K.push({ p: sc.pos.clone().addScaledVector(sc.n, 3.9).addScaledVector(sc.lx, -.85), l: sc.pos.clone().addScaledVector(sc.lx, -.85), f: 38 });
     });
+    K.push(whyPose(0), whyPose(1));
     K.push(P ? { p: V(0.6, 2.9, 15.5), l: V(0.6, 3.8, 0), f: 55 } : { p: V(-4.4, 2.1, 10.6), l: V(-1.1, 2.3, 0), f: 38 });
     K.push(P ? { p: V(0.6, 2.35, 3.0), l: V(0.6, 1.75, -2.75), f: 52 } : { p: V(-2.4, 2.45, 4.0), l: V(-0.5, 2.5, -2.75), f: 38 });
     K.push(P ? { p: V(0.6, 7, 17), l: V(0.6, 3.6, 0), f: 55 } : { p: V(0.6, 6.2, 14), l: V(2.2, 2.4, 0), f: 38 });
   }
   buildKeys();
-  const SE = [$('#hero'), ...$$('.chap'), $('#niches'), $('#brief'), $('#contact')];
-  let tops = [];
-  const measure = () => { tops = SE.map(e => e.getBoundingClientRect().top + scrollY); };
+  const SE = [$('#hero'), ...$$('.chap'), $('#why'), $('#proc'), $('#niches'), $('#brief'), $('#contact')];
+  const WHY = FEAT.length + 1, PROC = WHY + 1, procEl = $('#proc');
+  let tops = [], knee = .7;
+  const measure = () => {
+    tops = SE.map(e => e.getBoundingClientRect().top + scrollY);
+    const lb = $('#why .f5').getBoundingClientRect().bottom + scrollY;
+    knee = clamp((lb - tops[WHY]) / (tops[PROC] - tops[WHY]), .2, .92);
+  };
   measure();
 
   const camP = K[0].p.clone().add(V(0, 1.2, 7)), camL = K[0].l.clone(); let camF = K[0].f;
@@ -587,6 +628,11 @@ async function initScene() {
     let k = 0; for (let i = 0; i < tops.length; i++) if (tops[i] <= y) k = i;
     if (k >= K.length - 1) { tP.copy(K[K.length - 1].p); tL.copy(K[K.length - 1].l); return { k: K.length - 1, e: 0, f: K[K.length - 1].f }; }
     const f = clamp((y - tops[k]) / (tops[k + 1] - tops[k]));
+    if (k === WHY) {
+      const tp = f < knee ? f / knee * .55 : .55 + (f - knee) / (1 - knee) * .45;
+      const w = whyPose(tp); tP.copy(w.p); tL.copy(w.l);
+      return { k, e: 0, f: w.f, tp };
+    }
     const e = ease(clamp((f - .45) / .55));
     tP.lerpVectors(K[k].p, K[k + 1].p, e); tL.lerpVectors(K[k].l, K[k + 1].l, e);
     tP.y += Math.sin(e * Math.PI) * .5;
@@ -600,7 +646,9 @@ async function initScene() {
   new ResizeObserver(measure).observe(document.body);
 
   // adaptive quality
-  let slow = 0, last = performance.now(), degraded = false, vidFor0 = null;
+  let slow = 0, last = performance.now(), degraded = false, vidFor0 = null, orb = 0, beam = 0;
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const hazeEl = $('#haze');
   function degrade() { degraded = true; dpr = Math.max(1, Math.min(dpr, 1.25)); r.setPixelRatio(dpr); comp.setPixelRatio(dpr); }
 
   const railBtns = $$('#rail button'), caps = $$('.chap .cap');
@@ -647,6 +695,7 @@ async function initScene() {
       ambT.setHSL(hsl.h, Math.min(1, hsl.s * 1.3 + .2), .52);
     } catch { }
   }
+  const rq = new THREE.Quaternion(), op = new THREE.Vector3(), NSCR = Object.keys(screens).length;
   const fwd = new THREE.Vector3(), rt = new THREE.Vector3(), up = new THREE.Vector3(), fp = new THREE.Vector3(), fq = new THREE.Quaternion(), tq = new THREE.Quaternion(), eul = new THREE.Euler(), hp = new THREE.Vector3();
   let started = false;
   function frame(now) {
@@ -655,13 +704,21 @@ async function initScene() {
     const st = target();
     const near = st.e < .5 ? st.k : st.k + 1;
     const nF = FEAT.length;
-    const kind = near === 0 ? 'hero' : near <= nF ? 'work' : near === nF + 1 ? 'niche' : near === nF + 2 ? 'brief' : 'contact';
+    const kind = near === 0 ? 'hero' : near <= nF ? 'work' : near === WHY ? 'why' : near === PROC ? 'proc' : near === PROC + 1 ? 'niche' : near === PROC + 2 ? 'brief' : 'contact';
+    const tp = kind === 'why' ? (st.tp ?? 0) : kind === 'proc' ? 1 : 0;
+    const orbT = kind === 'why' ? smooth(.03, .3, tp) : kind === 'proc' ? 1 : 0;
+    orb += (orbT - orb) * Math.min(1, dt * 3);
+    beam += ((kind === 'why' ? smooth(0, .05, tp) : kind === 'proc' ? 1 : 0) - beam) * Math.min(1, dt * 3);
+    let hz = kind === 'why' ? smooth(.6, .97, tp) : 0;
+    if (scrollY >= tops[PROC] - 2) { const pb = procEl.getBoundingClientRect().bottom; hz = clamp((pb - innerHeight * .75) / (innerHeight * .6)); }
+    hazeEl.style.opacity = hz.toFixed(3);
+    document.body.classList.toggle('inwhy', kind === 'why' || kind === 'proc');
     document.body.classList.toggle('inworks', kind === 'work');
     railBtns.forEach((b, i) => b.classList.toggle('on', kind === 'work' && near - 1 === i));
     const kf = st.k + st.e;
     caps.forEach((c, i) => { const o = clamp(1 - Math.abs(kf - (i + 1)) * 2.6); c.style.opacity = o; c.style.visibility = o < .01 ? 'hidden' : ''; });
     const focusAmt = Math.max(0, ...Object.values(screens).map(sc => sc.ft));
-    const bs = FOCUS.id || kind === 'work' ? .3 : kind === 'brief' ? .45 : .85, bt = FOCUS.id || kind === 'work' ? .92 : .62;
+    const bs = FOCUS.id || kind === 'work' ? .3 : kind === 'brief' || kind === 'why' ? .45 : .85, bt = FOCUS.id || kind === 'work' ? .92 : .62;
     bloom.strength += (bs * (degraded ? .7 : 1) - bloom.strength) * Math.min(1, dt * 4); bloom.threshold += (bt - bloom.threshold) * Math.min(1, dt * 4);
 
     // camera: cinematic flight after a jump, damped follow otherwise
@@ -703,6 +760,7 @@ async function initScene() {
     fp.copy(cam.position).addScaledVector(fwd, FD).addScaledVector(up, P ? -.045 * visH : -.01 * visH);
     eul.set(-mouse.y * .1, mouse.x * .16, 0); tq.setFromEuler(eul); fq.copy(cam.quaternion).multiply(tq);
 
+    const camAz = Math.atan2(cam.position.x - A.x, cam.position.z - A.z);
     for (const [id, sc] of Object.entries(screens)) {
       const on = vidTarget === sc.scr;
       const m = on && vReady ? vtex : sc.poster;
@@ -715,18 +773,24 @@ async function initScene() {
       sc.haloM.opacity = (on ? .42 + Math.sin(now / 400) * .06 : hoverId === id ? .7 : .3) * (.3 + .7 * sc.lvl) * (1 - sc.ft * .6);
       sc.hs += ((hoverId === id ? 1.06 : 1) - sc.hs) * Math.min(1, dt * 8);
       hp.copy(sc.pos); if (!reduced) hp.y = sc.base + Math.sin(now / 1400 + sc.phase) * .05;
+      rq.copy(sc.homeQ);
+      if (orb > .001) {
+        const oe = ease(orb), ang = camAz + Math.PI + (sc.idx / Math.max(1, NSCR - 1) - .5) * 3.7 + Math.sin(now / 3000 + sc.idx) * .04;
+        op.set(A.x + Math.sin(ang) * 6.5, 3.4 + ((sc.idx % 3) - 1) * 1.6 + tp * 4, A.z + Math.cos(ang) * 6.5);
+        hp.lerp(op, oe); rq.slerp(cam.quaternion, oe);
+      }
       if (sc.ft > 0) {
         const e = ease(sc.ft);
         sc.grp.position.lerpVectors(hp, fp, e).addScaledVector(up, Math.sin(e * Math.PI) * .35);
-        sc.grp.quaternion.slerpQuaternions(sc.homeQ, fq, e);
+        sc.grp.quaternion.slerpQuaternions(rq, fq, e);
         sc.grp.scale.setScalar((1 + (FS - 1) * e) * sc.hs);
         sc.grp.renderOrder = 2;
-      } else { sc.grp.position.copy(hp); sc.grp.quaternion.copy(sc.homeQ); sc.grp.scale.setScalar(sc.hs); }
+      } else { sc.grp.position.copy(hp); sc.grp.quaternion.copy(rq); sc.grp.scale.setScalar(sc.hs * (orb > .001 && orb < .999 ? Math.abs(1 - 2 * ease(orb)) : 1)); }
     }
     // ambilight: the room takes the colours of what is playing
     if (now - ambAt > 120) {
       ambAt = now;
-      const src = kind === 'brief' && !FOCUS.id ? G : vReady ? vid : (screens[vidFor || FEAT[0].id].poster.image);
+      const src = (kind === 'why' || kind === 'proc') && !FOCUS.id ? logoC : kind === 'brief' && !FOCUS.id ? G : vReady ? vid : (screens[vidFor || FEAT[0].id].poster.image);
       if (src && (src.width || src.videoWidth)) sampleAmb(src);
     }
     amb.lerp(ambT, Math.min(1, dt * 2.2));
@@ -739,7 +803,16 @@ async function initScene() {
     glow.material.color.copy(amb);
     if (vidFor && screens[vidFor]) screens[vidFor].haloM.color.copy(amb);
     for (const [id, sc] of Object.entries(screens)) if (id !== vidFor) sc.haloM.color.lerp(CY, Math.min(1, dt * 2));
-    s.background.setRGB(.012 + amb.r * .018, .02 + amb.g * .018, .04 + amb.b * .02); s.fog.color.copy(s.background);
+    s.background.setRGB(.012 + amb.r * .018, .02 + amb.g * .018, .04 + amb.b * .02);
+    s.background.lerp(LIGHT, hz * .6); s.fog.color.copy(s.background); s.fog.density = .04 + .05 * hz;
+    const ro = 1 - orb;
+    wall.material.opacity = ro; slats.material.opacity = ro; NEONS.forEach(m => m.material.opacity = ro);
+    wall.visible = slats.visible = ro > .01; NEONS.forEach(m => m.visible = ro > .01);
+    beamG.visible = beam > .005; coreM.opacity = beam; glowM.opacity = beam * .5; glowM.color.copy(amb);
+    const showLogo = kind === 'why' || kind === 'proc';
+    if (monBg.material.map !== (showLogo ? logoT : mbT)) { monBg.material.map = showLogo ? logoT : mbT; monBg.material.needsUpdate = true; }
+    monV.visible = !showLogo || !!FOCUS.id; glow.visible = !showLogo;
+    if (now - hazeAt > 200) { hazeAt = now; hazeEl.style.setProperty('--amb', `${amb.r * 255 | 0},${amb.g * 255 | 0},${amb.b * 255 | 0}`); }
     dimM.color.copy(amb).multiplyScalar(.022);
     dimM.opacity = focusAmt * .82;
     let mm;

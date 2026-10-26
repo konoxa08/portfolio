@@ -300,3 +300,57 @@ body.cat .links a[href="#works"]{color:var(--fg)}
 .ld-mark{width:auto;height:auto;border-radius:0;background:none;box-shadow:none;display:grid;gap:8px;justify-items:start}
 .ld-mark b{font-size:30px}.ld-mark small{font-size:11px}
 @media (max-width:420px){.logo b{font-size:15px;letter-spacing:.26em}.logo small{font-size:6.5px;letter-spacing:.5em}}
+
+/* why: pull-back scene, text rides the light beam */
+.why{position:relative;height:440vh;height:440svh}
+.why-intro{position:absolute;top:128vh;left:0;right:0;display:grid;justify-items:center;gap:22px;text-align:center}
+.why-intro .tag{font-family:'Michroma',var(--display);font-size:11px;letter-spacing:.5em;margin-right:-.5em}
+.why-h{display:grid;font-size:clamp(44px,6.6vw,96px);line-height:.94;letter-spacing:-.035em;text-transform:uppercase;font-weight:850;text-shadow:0 12px 32px rgba(0,0,0,.55)}
+.why-h span{white-space:nowrap}
+.why-h .grad{filter:drop-shadow(0 0 26px rgba(63,214,255,.35))}
+.feat{position:absolute;width:300px;display:grid;gap:12px;text-shadow:0 6px 20px rgba(0,0,0,.7)}
+.feat h3{margin:0;font-size:20px;line-height:1.05;text-transform:uppercase;letter-spacing:-.01em;font-weight:800}
+.feat p{color:rgba(238,246,255,.86);font-size:15px;line-height:1.45}
+.ic{width:34px;height:34px;fill:none;stroke:var(--cyan);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 8px rgba(63,214,255,.7))}
+.f1,.f3{right:calc(50% + 80px);text-align:right;justify-items:end}
+.f2,.f4{left:calc(50% + 80px)}
+.f1,.f2{top:215vh}.f3,.f4{top:256vh}
+.f5{top:298vh;left:50%;transform:translateX(-50%);text-align:center;justify-items:center}
+
+/* light haze between the dark scene and the light section */
+.haze{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0;--amb:63,214,255;
+  background:radial-gradient(70% 60% at 50% 55%,#f4fbfe 0%,#e7f3f8 45%,#cfe6ef 100%)}
+.haze i{position:absolute;inset:-20%;background:radial-gradient(40% 35% at 30% 40%,rgba(var(--amb),.35),transparent 70%),radial-gradient(45% 40% at 72% 62%,rgba(var(--amb),.28),transparent 70%);filter:blur(30px);animation:drift 14s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translate(4%,-3%) scale(1.08)}}
+
+/* process: the light section */
+.proc{--light:#e9f4f8;--ink:#0b1420;position:relative;color:var(--ink);margin-top:-34vh;
+  margin-left:calc(-1 * var(--gut-l));margin-right:calc(-1 * var(--gut-r));padding:34vh var(--gut-r) 0 var(--gut-l);
+  background:linear-gradient(180deg,rgba(233,244,248,0) 0,var(--light) 34vh,var(--light) calc(100% - 34vh),rgba(233,244,248,0) 100%)}
+.proc-in{max-width:1120px;margin:0 auto;padding-bottom:44vh;display:grid;gap:0}
+.proc-h{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:40px;align-items:end;padding-bottom:40px;border-bottom:1px solid rgba(11,20,32,.16)}
+.proc-h h2{font-size:clamp(36px,4.6vw,64px);line-height:1;text-transform:uppercase;font-weight:850;letter-spacing:-.03em}
+.proc-h h2 span{color:#7f8f9b}
+.proc-h p{font-size:15px;line-height:1.55;color:rgba(11,20,32,.72)}
+.steps{list-style:none;margin:0;padding:0}
+.steps li{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;padding:40px 0;border-bottom:1px solid rgba(11,20,32,.16);align-items:baseline}
+.st-n{display:flex;gap:18px;align-items:baseline}
+.st-n b{font-family:'Michroma',var(--display);font-weight:400;font-size:13px;color:#1592c4;letter-spacing:.1em}
+.st-n span{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.steps p{font-size:clamp(18px,1.7vw,22px);line-height:1.42;max-width:680px;color:var(--ink)}
+.proc-cta{margin-top:44px}
+.b1.dark{background:var(--ink);color:#fff;box-shadow:0 14px 30px rgba(11,20,32,.18)}
+.b2.dark{border-color:rgba(11,20,32,.3);color:var(--ink);background:transparent}
+
+@media (max-width:760px){
+  .why{height:auto;padding-top:96svh;padding-bottom:130svh;display:grid;gap:16svh;justify-items:center}
+  .why-intro,.feat{position:static;transform:none}
+  .why-intro{gap:16px}
+  .why-h{font-size:clamp(34px,11.5vw,56px)}
+  .feat{width:min(320px,100%);text-align:center;justify-items:center}
+  .proc-h{grid-template-columns:1fr;gap:18px}
+  .steps li{grid-template-columns:1fr;gap:12px;padding:28px 0}
+}
+
+.scrim{transition:opacity .6s}
+body.inwhy .scrim{opacity:.25}
