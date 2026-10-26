@@ -330,7 +330,7 @@ async function initScene() {
   const lowEnd = matchMedia('(max-width: 760px)').matches || (navigator.hardwareConcurrency || 8) <= 4;
   const r = new THREE.WebGLRenderer({ canvas, antialias: !lowEnd, powerPreference: 'high-performance' });
   if (!r.getContext()) throw new Error('no webgl');
-  let dpr = Math.min(devicePixelRatio, lowEnd ? 1.5 : 1.75);
+  let dpr = Math.min(devicePixelRatio, lowEnd ? 1.5 : 2);
   r.setPixelRatio(dpr); r.setSize(innerWidth, innerHeight, false);
   r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.3;
   const s = new THREE.Scene(); s.background = new THREE.Color(0x03050a); s.fog = new THREE.FogExp2(0x03050a, .04);
@@ -339,12 +339,12 @@ async function initScene() {
   const man = new THREE.LoadingManager();
   man.onProgress = (u, a, b) => fill.style.width = Math.round(a / b * 100) + '%';
   const TL = new THREE.TextureLoader(man);
-  const tex = url => { const t = TL.load(url); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
+  const tex = url => { const t = TL.load(url); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = r.capabilities.getMaxAnisotropy(); return t; };
 
   // floor
   let reflector = null;
   if (!lowEnd) {
-    reflector = new Reflector(new THREE.PlaneGeometry(60, 60), { textureWidth: innerWidth * .5, textureHeight: innerHeight * .5, color: 0x1a2029 });
+    reflector = new Reflector(new THREE.PlaneGeometry(60, 60), { textureWidth: innerWidth * Math.min(dpr, 1.5) * .7, textureHeight: innerHeight * Math.min(dpr, 1.5) * .7, color: 0x1a2029 });
     reflector.rotation.x = -Math.PI / 2; s.add(reflector);
   }
   const fl2 = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x05070c, roughness: lowEnd ? .35 : .55, metalness: lowEnd ? .6 : .2, transparent: !lowEnd, opacity: .9 }));
@@ -440,13 +440,15 @@ async function initScene() {
   const nd = lowEnd ? 220 : 520, pg = new THREE.BufferGeometry(), pts = new Float32Array(nd * 3);
   for (let i = 0; i < nd; i++) { pts[i * 3] = (Math.random() - .5) * 22 + .6; pts[i * 3 + 1] = Math.random() * 7; pts[i * 3 + 2] = (Math.random() - .5) * 12; }
   pg.setAttribute('position', new THREE.BufferAttribute(pts, 3));
-  const dust = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x9fe9ff, size: .025, transparent: true, opacity: .5, depthWrite: false }));
+  const dotC = document.createElement('canvas'); dotC.width = dotC.height = 32;
+  { const x = dotC.getContext('2d'), gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.4, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 32, 32); }
+  const dust = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x9fe9ff, size: .06, map: new THREE.CanvasTexture(dotC), transparent: true, opacity: .32, depthWrite: false, blending: THREE.AdditiveBlending }));
   s.add(dust);
 
   // post
-  const comp = new EffectComposer(r);
+  const comp = new EffectComposer(r, new THREE.WebGLRenderTarget(innerWidth * dpr, innerHeight * dpr, { type: THREE.HalfFloatType, samples: lowEnd ? 2 : 4 }));
   comp.addPass(new RenderPass(s, cam));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), .85, .6, .62);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .85, .6, .62);
   comp.addPass(bloom); comp.addPass(new OutputPass());
   comp.setPixelRatio(dpr); comp.setSize(innerWidth, innerHeight);
 
@@ -455,7 +457,7 @@ async function initScene() {
   Object.assign(vid, { muted: true, loop: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous' });
   vid.setAttribute('playsinline', ''); vid.setAttribute('muted', '');
   window.__vid = vid;
-  const vtex = new THREE.VideoTexture(vid); vtex.colorSpace = THREE.SRGBColorSpace;
+  const vtex = new THREE.VideoTexture(vid); vtex.colorSpace = THREE.SRGBColorSpace; vtex.generateMipmaps = true; vtex.minFilter = THREE.LinearMipmapLinearFilter; vtex.anisotropy = r.capabilities.getMaxAnisotropy();
   let vidId = null;
   const wantVideo = id => {
     if (vidId === id) return;
@@ -537,14 +539,13 @@ async function initScene() {
 
   addEventListener('resize', () => {
     r.setSize(innerWidth, innerHeight, false); comp.setSize(innerWidth, innerHeight);
-    bloom.setSize(innerWidth / 2, innerHeight / 2);
     cam.aspect = innerWidth / innerHeight; buildKeys(); measure();
   });
   new ResizeObserver(measure).observe(document.body);
 
   // adaptive quality
   let slow = 0, last = performance.now(), degraded = false, vidFor0 = null;
-  function degrade() { degraded = true; dpr = 1; r.setPixelRatio(1); comp.setPixelRatio(1); if (reflector) reflector.visible = false; }
+  function degrade() { degraded = true; dpr = Math.max(1, Math.min(dpr, 1.25)); r.setPixelRatio(dpr); comp.setPixelRatio(dpr); }
 
   const railBtns = $$('#rail button'), caps = $$('.chap .cap');
   // pointer: parallax, hover, click
@@ -576,7 +577,7 @@ async function initScene() {
   let started = false;
   function frame(now) {
     const dt = Math.min(.1, (now - last) / 1000); last = now;
-    if (started && !degraded && !window.__noDegrade) { slow = dt > .045 ? slow + dt : Math.max(0, slow - dt * .5); if (slow > 2.5) degrade(); }
+    if (started && !degraded && !window.__noDegrade) { slow = dt > .055 ? slow + dt : Math.max(0, slow - dt * .5); if (slow > 4) degrade(); }
     const st = target();
     const near = st.e < .5 ? st.k : st.k + 1;
     const nF = FEAT.length;
