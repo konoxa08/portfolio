@@ -61,6 +61,10 @@
       <div class="chips" id="nchips" role="tablist" aria-label="Ніші"></div>
       <p class="hint" id="nhint"></p>
       <ul class="nlist" id="nlist"></ul>
+      <div class="insha" id="insha" hidden>
+        <p>Вашої ніші немає в списку? Напишіть мені напряму, і я запропоную ідею ролика саме під ваш бізнес.</p>
+        <div class="btns"><a class="b1" data-c="tg-link" href="#contact" target="_blank" rel="noopener">Написати в Telegram</a><a class="b2" href="#brief">Або заповнити бриф</a></div>
+      </div>
     </div>
   </section>
 
@@ -111,6 +115,17 @@
 <button id="home" class="home" type="button" aria-label="На головну">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v8.5h11V10"/></svg><span>Головна</span>
 </button>
+
+<div id="catalog" aria-hidden="true">
+  <div class="cat-in" data-lenis-prevent>
+    <header class="cat-h">
+      <div><p class="k">Портфоліо</p><h2>Усі роботи <span id="cat-n"></span></h2></div>
+      <button type="button" class="cat-x" id="cat-x">Закрити <kbd>Esc</kbd></button>
+    </header>
+    <div class="chips" id="cat-chips" role="tablist" aria-label="Фільтр за нішею"></div>
+    <ul class="cat-grid" id="cat-grid"></ul>
+  </div>
+</div>
 
 <div id="viewer" aria-live="polite">
   <div class="vw-info">

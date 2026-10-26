@@ -6,13 +6,35 @@
     "phone": "+38066 XXX XX XX"
   },
   "niches": [
-    { "id": "nerukhomist", "name": "Нерухомість" },
-    { "id": "wellness", "name": "Йога і фітнес" },
-    { "id": "tovary", "name": "Товари і бренди" },
-    { "id": "fashion", "name": "Fashion" },
-    { "id": "osvita", "name": "Освіта" }
+    {
+      "id": "nerukhomist",
+      "name": "Нерухомість"
+    },
+    {
+      "id": "wellness",
+      "name": "Йога і фітнес"
+    },
+    {
+      "id": "tovary",
+      "name": "Товари і бренди"
+    },
+    {
+      "id": "fashion",
+      "name": "Fashion"
+    },
+    {
+      "id": "osvita",
+      "name": "Освіта"
+    }
   ],
-  "featured": ["realty", "yoga", "teapot", "gongpaper", "bal", "auto"],
+  "featured": [
+    "realty",
+    "yoga",
+    "teapot",
+    "gongpaper",
+    "bal",
+    "auto"
+  ],
   "works": [
     {
       "id": "realty",
@@ -79,14 +101,6 @@
       "desc": "Деталі чайника крупним планом та інтерфейс перевірки автентичності."
     },
     {
-      "id": "screen",
-      "title": "Реклама на моніторі",
-      "niche": "tovary",
-      "style": "Екран монітора",
-      "dur": 26,
-      "desc": "Жива сцена столу, а на екрані конфігуратор, відгуки й логотип."
-    },
-    {
       "id": "gongneon",
       "title": "Гунчунь: 185 мл",
       "niche": "tovary",
@@ -96,14 +110,68 @@
     }
   ],
   "briefNiches": [
-    { "id": "kavyarnya", "name": "Кав'ярня", "tag": "Кава, що будить місто", "icon": "cup", "example": "Ваша кав'ярня" },
-    { "id": "nerukhomist", "name": "Нерухомість", "tag": "Знайдемо ваш дім", "icon": "house", "example": "Ваше агентство" },
-    { "id": "wellness", "name": "Йога і фітнес", "tag": "Рух щодня", "icon": "figure", "example": "Ваша студія" },
-    { "id": "byuti", "name": "Б'юті", "tag": "Краса без поспіху", "icon": "spark", "example": "Ваш салон" },
-    { "id": "tovary", "name": "Магазин", "tag": "Якість, яку видно", "icon": "bag", "example": "Ваш магазин" },
-    { "id": "restoran", "name": "Ресторан", "tag": "Смак, до якого повертаються", "icon": "plate", "example": "Ваш ресторан" },
-    { "id": "fashion", "name": "Fashion", "tag": "Стиль у деталях", "icon": "shoe", "example": "Ваш бренд" },
-    { "id": "osvita", "name": "Освіта", "tag": "Вчимо з першого дня", "icon": "book", "example": "Ваша школа" },
-    { "id": "insha", "name": "Інша ніша", "tag": "Ваш бізнес у русі", "icon": "star", "example": "Ваш бізнес" }
+    {
+      "id": "kavyarnya",
+      "name": "Кав'ярня",
+      "tag": "Кава, що будить місто",
+      "icon": "cup",
+      "example": "Ваша кав'ярня"
+    },
+    {
+      "id": "nerukhomist",
+      "name": "Нерухомість",
+      "tag": "Знайдемо ваш дім",
+      "icon": "house",
+      "example": "Ваше агентство"
+    },
+    {
+      "id": "wellness",
+      "name": "Йога і фітнес",
+      "tag": "Рух щодня",
+      "icon": "figure",
+      "example": "Ваша студія"
+    },
+    {
+      "id": "byuti",
+      "name": "Б'юті",
+      "tag": "Краса без поспіху",
+      "icon": "spark",
+      "example": "Ваш салон"
+    },
+    {
+      "id": "tovary",
+      "name": "Магазин",
+      "tag": "Якість, яку видно",
+      "icon": "bag",
+      "example": "Ваш магазин"
+    },
+    {
+      "id": "restoran",
+      "name": "Ресторан",
+      "tag": "Смак, до якого повертаються",
+      "icon": "plate",
+      "example": "Ваш ресторан"
+    },
+    {
+      "id": "fashion",
+      "name": "Fashion",
+      "tag": "Стиль у деталях",
+      "icon": "shoe",
+      "example": "Ваш бренд"
+    },
+    {
+      "id": "osvita",
+      "name": "Освіта",
+      "tag": "Вчимо з першого дня",
+      "icon": "book",
+      "example": "Ваша школа"
+    },
+    {
+      "id": "insha",
+      "name": "Інша ніша",
+      "tag": "Ваш бізнес у русі",
+      "icon": "star",
+      "example": "Ваш бізнес"
+    }
   ]
 }

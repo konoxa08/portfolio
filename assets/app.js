@@ -71,7 +71,8 @@ FEAT.forEach((w, i) => {
 document.addEventListener('click', e => {
   const a = e.target.closest('a[href^="#"]'); if (!a) return;
   const el = document.querySelector(a.getAttribute('href')); if (!el) return;
-  e.preventDefault(); a.blur(); go(el);
+  e.preventDefault(); a.blur();
+  if (a.getAttribute('href') === '#works') openCatalog(); else go(el);
 });
 $('#home').onclick = () => go($('#hero'));
 
@@ -84,9 +85,13 @@ data.niches.forEach(n => {
   b.onclick = () => setNiche(n.id);
   nchips.append(b);
 });
+{ const b = document.createElement('button'); b.type = 'button'; b.role = 'tab'; b.textContent = 'Інша'; b.dataset.n = 'insha'; b.onclick = () => setNiche('insha'); nchips.append(b); }
 function setNiche(id) {
   curNiche = id;
   $$('#nchips button').forEach(b => b.setAttribute('aria-selected', b.dataset.n === id));
+  const other = id === 'insha';
+  $('#insha').hidden = !other; $('#nlist').hidden = other; $('#nhint').hidden = other;
+  if (other) return;
   const list = WORKS.filter(w => w.niche === id);
   $('#nhint').textContent = `${list.length} ${list.length === 1 ? 'ролик' : list.length < 5 ? 'ролики' : 'роликів'} у цій ніші. Екрани в студії вже підсвітились.`;
   $('#nlist').innerHTML = list.map(w => `<li><button type="button" data-id="${w.id}"><img src="media/${w.id}.jpg" alt="" loading="lazy"><span><b>${w.title}</b><small>${w.style}</small></span><em>${w.dur} с</em></button></li>`).join('');
@@ -113,6 +118,53 @@ $('#bform').addEventListener('submit', e => {
   copy(txt, 'Бриф скопійовано. Вставте його в чат Telegram');
   window.open(tgUrl, '_blank', 'noopener');
 });
+
+// catalogue of all works
+const catEl = $('#catalog'), catGrid = $('#cat-grid'), catChips = $('#cat-chips');
+let catFilter = 'all', catReturn = false;
+$('#cat-n').textContent = WORKS.length;
+[{ id: 'all', name: 'Усі' }, ...data.niches].forEach(n => {
+  const cnt = n.id === 'all' ? WORKS.length : WORKS.filter(w => w.niche === n.id).length;
+  if (!cnt) return;
+  const b = document.createElement('button'); b.type = 'button'; b.role = 'tab'; b.dataset.n = n.id;
+  b.innerHTML = `${n.name} <small>${cnt}</small>`;
+  b.onclick = () => { catFilter = n.id; renderCat(); };
+  catChips.append(b);
+});
+function renderCat() {
+  $$('#cat-chips button').forEach(b => b.setAttribute('aria-selected', b.dataset.n === catFilter));
+  const list = ORDER.filter(w => catFilter === 'all' || w.niche === catFilter);
+  catGrid.innerHTML = list.map(w => `<li><button type="button" class="card" data-cid="${w.id}">
+    <span class="cv"><img src="media/${w.id}.jpg" alt="" loading="lazy"><i class="pl">${PLAY_SVG}</i><em>${w.dur} с</em></span>
+    <b>${w.title}</b><small>${NICHE[w.niche]} · ${w.style}</small></button></li>`).join('');
+}
+function openCatalog() {
+  renderCat(); catEl.classList.add('on'); catEl.setAttribute('aria-hidden', 'false'); document.body.classList.add('cat');
+  lockScroll(true); setTimeout(() => $('#cat-x').focus({ preventScroll: true }), 50);
+}
+function closeCatalog() {
+  catEl.classList.remove('on'); catEl.setAttribute('aria-hidden', 'true'); document.body.classList.remove('cat');
+  catGrid.querySelectorAll('video').forEach(v => v.remove()); lockScroll(false);
+}
+$('#cat-x').onclick = closeCatalog;
+catEl.addEventListener('click', e => {
+  const c = e.target.closest('.card');
+  if (c) { closeCatalog(); catReturn = true; openWork(c.dataset.cid); return; }
+  if (e.target === catEl || e.target.classList.contains('cat-in')) closeCatalog();
+});
+addEventListener('keydown', e => { if (e.key === 'Escape' && catEl.classList.contains('on')) closeCatalog(); });
+if (finePointer) {
+  catGrid.addEventListener('pointerover', e => {
+    const c = e.target.closest('.card'); if (!c || c.querySelector('video')) return;
+    const v = document.createElement('video'); Object.assign(v, { muted: true, loop: true, playsInline: true, src: `media/${c.dataset.cid}.mp4` });
+    v.setAttribute('playsinline', ''); v.oncanplay = () => v.classList.add('on');
+    c.querySelector('.cv').append(v); v.play().catch(() => {});
+  });
+  catGrid.addEventListener('pointerout', e => {
+    const c = e.target.closest('.card'); if (!c || c.contains(e.relatedTarget)) return;
+    const v = c.querySelector('video'); if (v) { v.pause(); v.remove(); }
+  });
+}
 
 // copy + toast
 const toast = $('#toast'); let toastT;
@@ -357,15 +409,17 @@ async function initScene() {
   const m4 = new THREE.Matrix4();
   for (let i = 0; i < NS; i++) { m4.makeTranslation(0.6 + (i - NS / 2) * .26, 4.5, -4.05); slats.setMatrixAt(i, m4); }
   s.add(slats);
-  const neon = (w, h, col, k, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, .04), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(k) })); m.position.set(x, y, z); s.add(m); return m; };
+  const NEONS = [];
+  const neon = (w, h, col, k, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, .04), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(k) })); m.position.set(x, y, z); s.add(m); m.userData = { base: new THREE.Color(col), k }; NEONS.push(m); return m; };
   neon(7, .03, 0x3fd6ff, 2.4, 0.6, 5.4, -3.9);
   neon(.035, 3.2, 0x8b7bff, 3, -7.4, 3.2, -3.9);
   neon(.035, 2.2, 0x3fd6ff, 2.5, 8.6, 2.6, -3.9);
 
   s.add(new THREE.AmbientLight(0x6a7aa0, .16));
   const sp = new THREE.SpotLight(0x9fe9ff, 110, 18, .7, .6, 1.5); sp.position.set(0.6, 6, -2.5); sp.target.position.set(0.6, 0, -3.5); s.add(sp, sp.target);
-  const pl = (c, i, x, y, z) => { const p = new THREE.PointLight(c, i, 8, 2); p.position.set(x, y, z); s.add(p); };
-  pl(0x3fd6ff, 14, 0.6, 2.2, -1.2); pl(0x8b7bff, 8, -3.5, 2.5, 1.5); pl(0x3fd6ff, 8, 4.5, 2, 1);
+  const pl = (c, i, x, y, z) => { const p = new THREE.PointLight(c, i, 8, 2); p.position.set(x, y, z); s.add(p); p.userData.base = new THREE.Color(c); return p; };
+  const PLS = [pl(0x3fd6ff, 14, 0.6, 2.2, -1.2), pl(0x8b7bff, 8, -3.5, 2.5, 1.5), pl(0x3fd6ff, 8, 4.5, 2, 1)];
+  const ambL = new THREE.PointLight(0x3fd6ff, 0, 9, 1.6); s.add(ambL);
 
   // desk + monitor
   const dark = c => new THREE.MeshStandardMaterial({ color: c, roughness: .35, metalness: .45 });
@@ -481,6 +535,7 @@ async function initScene() {
     if (!FOCUS.id) return;
     FOCUS.id = null; document.body.classList.remove('focus'); lockScroll(false);
     vid.muted = !soundOn;
+    if (catReturn) { catReturn = false; openCatalog(); }
   }
   const step = d => { if (!FOCUS.id) return; const i = ORDER.findIndex(w => w.id === FOCUS.id); openViewer(ORDER[(i + d + ORDER.length) % ORDER.length].id); };
   openWork = openViewer;
@@ -573,6 +628,24 @@ async function initScene() {
     const id = pick(); if (id) openViewer(id);
   });
 
+  const ambC = document.createElement('canvas'); ambC.width = 9; ambC.height = 16;
+  const ambX = ambC.getContext('2d', { willReadFrequently: true });
+  const amb = new THREE.Color(0x3fd6ff), ambT = new THREE.Color(0x3fd6ff), CY = new THREE.Color(0x3fd6ff), hsl = {};
+  let ambAt = 0;
+  function sampleAmb(src) {
+    try {
+      ambX.drawImage(src, 0, 0, 9, 16);
+      const d = ambX.getImageData(0, 0, 9, 16).data; let rr = 0, gg = 0, bb = 0, w = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const R = d[i], G2 = d[i + 1], B = d[i + 2], mx = Math.max(R, G2, B), mn = Math.min(R, G2, B);
+        const wt = (mx - mn + 6) * (mx / 255); rr += R * wt; gg += G2 * wt; bb += B * wt; w += wt;
+      }
+      if (w < 1) return;
+      const c = new THREE.Color().setRGB(rr / w / 255, gg / w / 255, bb / w / 255, THREE.SRGBColorSpace); c.getHSL(hsl);
+      if (hsl.s < .12) return; // near-grey frame: keep the last colour
+      ambT.setHSL(hsl.h, Math.min(1, hsl.s * 1.3 + .2), .52);
+    } catch { }
+  }
   const fwd = new THREE.Vector3(), rt = new THREE.Vector3(), up = new THREE.Vector3(), fp = new THREE.Vector3(), fq = new THREE.Quaternion(), tq = new THREE.Quaternion(), eul = new THREE.Euler(), hp = new THREE.Vector3();
   let started = false;
   function frame(now) {
@@ -612,7 +685,7 @@ async function initScene() {
     let vidTarget = null, vidFor = null;
     if (FOCUS.id) { vidFor = FOCUS.id; vidTarget = screens[FOCUS.id].scr; }
     else if (kind === 'work') { vidFor = FEAT[near - 1].id; vidTarget = screens[vidFor].scr; }
-    else if (kind === 'niche') { vidFor = WORKS.find(w => w.niche === curNiche).id; vidTarget = monV; }
+    else if (kind === 'niche') { const w = WORKS.find(w => w.niche === curNiche); vidFor = (w || FEAT[0]).id; vidTarget = monV; }
     else if (kind === 'hero' || kind === 'contact') { vidFor = FEAT[0].id; vidTarget = monV; }
     if (vidFor) wantVideo(vidFor); vidFor0 = vidFor;
     monV.userData.id = kind === 'brief' ? null : (vidFor0 || FEAT[0].id);
@@ -634,7 +707,7 @@ async function initScene() {
       const m = on && vReady ? vtex : sc.poster;
       if (sc.scr.material.map !== m) { sc.scr.material.map = m; sc.scr.material.needsUpdate = true; }
       sc.ft = clamp(sc.ft + (FOCUS.id === id ? 1 : -1) * dt / (reduced ? .01 : .85));
-      const want = FOCUS.id ? (FOCUS.id === id ? 1 : .15) : kind === 'niche' ? (byId[id].niche === curNiche ? 1 : .16) : on ? 1 : kind === 'work' ? .45 : 1;
+      const want = FOCUS.id ? (FOCUS.id === id ? 1 : .15) : kind === 'niche' ? (curNiche === 'insha' ? .55 : byId[id].niche === curNiche ? 1 : .16) : on ? 1 : kind === 'work' ? .45 : 1;
       sc.lvl += (want - sc.lvl) * Math.min(1, dt * 5);
       const c = sc.lvl * (on ? 1 : sc.dim);
       sc.scr.material.color.setRGB(c, c, c);
@@ -649,6 +722,24 @@ async function initScene() {
         sc.grp.renderOrder = 2;
       } else { sc.grp.position.copy(hp); sc.grp.quaternion.copy(sc.homeQ); sc.grp.scale.setScalar(sc.hs); }
     }
+    // ambilight: the room takes the colours of what is playing
+    if (now - ambAt > 120) {
+      ambAt = now;
+      const src = kind === 'brief' && !FOCUS.id ? G : vReady ? vid : (screens[vidFor || FEAT[0].id].poster.image);
+      if (src && (src.width || src.videoWidth)) sampleAmb(src);
+    }
+    amb.lerp(ambT, Math.min(1, dt * 2.2));
+    const tgt = vidTarget && vidTarget !== monV ? vidTarget : null;
+    if (tgt) { const sc = screens[vidFor]; ambL.position.copy(sc.grp.position).addScaledVector(sc.n, 1.3); }
+    else ambL.position.set(0.6, 2.6, -1.5);
+    ambL.color.copy(amb); ambL.intensity = reduced ? 10 : 16 + (FOCUS.id ? 8 : 0);
+    PLS.forEach(p => p.color.copy(p.userData.base).lerp(amb, .65));
+    NEONS.forEach(m => m.material.color.copy(m.userData.base).lerp(amb, .6).multiplyScalar(m.userData.k));
+    glow.material.color.copy(amb);
+    if (vidFor && screens[vidFor]) screens[vidFor].haloM.color.copy(amb);
+    for (const [id, sc] of Object.entries(screens)) if (id !== vidFor) sc.haloM.color.lerp(CY, Math.min(1, dt * 2));
+    s.background.setRGB(.012 + amb.r * .018, .02 + amb.g * .018, .04 + amb.b * .02); s.fog.color.copy(s.background);
+    dimM.color.copy(amb).multiplyScalar(.022);
     dimM.opacity = focusAmt * .82;
     let mm;
     if (kind === 'brief') { drawGen(now); genT.needsUpdate = true; mm = genT; }
