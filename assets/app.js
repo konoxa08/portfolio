@@ -181,10 +181,79 @@ function closeCatalog() {
 $('#cat-x').onclick = closeCatalog;
 catEl.addEventListener('click', e => {
   const c = e.target.closest('.card');
-  if (c) { e.stopPropagation(); const rect = c.querySelector('.cv').getBoundingClientRect(); closeCatalog(); catReturn = true; openWork(c.dataset.cid, rect); return; }
+  if (c) { e.stopPropagation(); openDView(c.dataset.cid); return; }
   if (e.target === catEl || e.target.classList.contains('cat-in')) closeCatalog();
 });
-addEventListener('keydown', e => { if (e.key === 'Escape' && catEl.classList.contains('on')) closeCatalog(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && catEl.classList.contains('on') && !DV.id) closeCatalog(); });
+
+/* catalogue viewer: the thumbnail itself grows into the player, right on top of the grid */
+const DV = { id: null, sound: true };
+const dv = $('#dview'), dvStage = $('#dv-stage'), dvv = $('#dvv');
+const dq = s2 => dv.querySelector(s2);
+const EASE = 'cubic-bezier(.23,1,.32,1)';
+const thumbOf = id => catGrid.querySelector(`.card[data-cid="${id}"] .cv`);
+function stageRect() {
+  const narrowV = innerWidth / innerHeight < .8;
+  const h = Math.min(innerHeight * (narrowV ? .62 : .8), (innerWidth * (narrowV ? .86 : .5)) * 16 / 9), w = h * 9 / 16;
+  return { left: (innerWidth - w) / 2, top: (innerHeight - h) / 2 + (narrowV ? innerHeight * .02 : -innerHeight * .01), width: w, height: h };
+}
+function placeStage() { const r = stageRect(); Object.assign(dvStage.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }); return r; }
+function flip(from, to, back) {
+  const sx = from.width / to.width, sy = from.height / to.height, dx = from.left - to.left, dy = from.top - to.top;
+  const a = [{ transform: `translate(${dx}px,${dy}px) scale(${sx},${sy})`, borderRadius: '18px' }, { transform: 'none', borderRadius: '22px' }];
+  return dvStage.animate(back ? a.reverse() : a, { duration: back ? 420 : 620, easing: back ? 'cubic-bezier(.32,.72,0,1)' : EASE, fill: 'both' });
+}
+function fillDV(id) {
+  const w = byId[id], i = ORDER.indexOf(w);
+  dq('.dv-n').textContent = `${String(i + 1).padStart(2, '0')} / ${String(ORDER.length).padStart(2, '0')}`;
+  dq('.dv-k').textContent = `${NICHE[w.niche]} · ${w.style}`; dq('.dv-t').textContent = w.title; dq('.dv-d').textContent = w.desc;
+  dvv.poster = `media/${id}.jpg`; dvv.src = `media/${id}.mp4`; dvv.muted = !DV.sound; dvv.play().catch(() => {});
+}
+function openDView(id) {
+  const th = thumbOf(id); DV.id = id; fillDV(id);
+  dv.classList.add('on'); dv.setAttribute('aria-hidden', 'false'); catEl.classList.add('dim');
+  const to = placeStage(); if (th) flip(th.getBoundingClientRect(), to, false);
+  th && th.classList.add('lift');
+}
+function closeDView() {
+  if (!DV.id) return;
+  const id = DV.id; DV.id = null; dvv.pause();
+  const th = thumbOf(id); catEl.classList.remove('dim'); dv.classList.remove('on'); dv.setAttribute('aria-hidden', 'true');
+  dv.classList.add('closing');
+  const done = () => { dv.classList.remove('closing'); dvStage.getAnimations().forEach(a => a.cancel()); dvv.removeAttribute('src'); dvv.load(); catGrid.querySelectorAll('.lift').forEach(x => x.classList.remove('lift')); };
+  if (th) flip(th.getBoundingClientRect(), stageRect(), true).finished.then(done, done); else done();
+}
+function stepDV(d) {
+  if (!DV.id) return;
+  const list = ORDER; const i = list.findIndex(w => w.id === DV.id), nid = list[(i + d + list.length) % list.length].id;
+  catGrid.querySelectorAll('.lift').forEach(x => x.classList.remove('lift'));
+  dvStage.animate([{ opacity: 1, filter: 'blur(0px)', translate: '0 0' }, { opacity: 0, filter: 'blur(8px)', translate: `${-d * 24}px 0` }], { duration: 160, easing: 'ease-in', fill: 'forwards' })
+    .finished.then(() => {
+      DV.id = nid; fillDV(nid); const th = thumbOf(nid); th && th.classList.add('lift');
+      dvStage.animate([{ opacity: 0, filter: 'blur(8px)', translate: `${d * 24}px 0` }, { opacity: 1, filter: 'blur(0px)', translate: '0 0' }], { duration: 320, easing: EASE, fill: 'forwards' });
+    });
+}
+dq('.dv-x').onclick = closeDView; dq('.dv-prev').onclick = () => stepDV(-1); dq('.dv-next').onclick = () => stepDV(1);
+const dvPlay = dq('.dv-play'), dvSnd = dq('.dv-snd'), dvFill = dq('.dv-fill'), dvTime = dq('.dv-time'), dvTrack = dq('.dv-track');
+dvPlay.onclick = () => dvv.paused ? dvv.play() : dvv.pause();
+dvSnd.onclick = () => { DV.sound = !DV.sound; dvv.muted = !DV.sound; dvSnd.setAttribute('aria-pressed', DV.sound); };
+dvStage.onclick = () => dvPlay.click();
+const fmt2 = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+dvv.addEventListener('timeupdate', () => { const d = dvv.duration || 0; dvFill.style.transform = `scaleX(${d ? dvv.currentTime / d : 0})`; dvTime.textContent = `${fmt2(dvv.currentTime || 0)} / ${fmt2(d)}`; });
+dvv.addEventListener('play', () => dvPlay.setAttribute('aria-pressed', 'true')); dvv.addEventListener('pause', () => dvPlay.setAttribute('aria-pressed', 'false'));
+const dvSeek = e => { const b = dvTrack.getBoundingClientRect(); if (dvv.duration) dvv.currentTime = clamp((e.clientX - b.left) / b.width) * dvv.duration; };
+dvTrack.addEventListener('pointerdown', e => { dvSeek(e); dvTrack.setPointerCapture(e.pointerId); dvTrack.onpointermove = dvSeek; });
+dvTrack.addEventListener('pointerup', () => dvTrack.onpointermove = null);
+dv.addEventListener('click', e => { if (e.target === dv) closeDView(); });
+addEventListener('keydown', e => {
+  if (!DV.id) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeDView(); } else if (e.key === 'ArrowRight') stepDV(1); else if (e.key === 'ArrowLeft') stepDV(-1);
+  else if (e.key === ' ') { e.preventDefault(); dvPlay.click(); }
+});
+addEventListener('resize', () => { if (DV.id) placeStage(); });
+let dsw = null;
+dv.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' && !e.target.closest('.vw-bar')) dsw = { x: e.clientX, y: e.clientY }; });
+dv.addEventListener('pointerup', e => { if (!dsw) return; const dx = e.clientX - dsw.x, dy = e.clientY - dsw.y; dsw = null; if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) stepDV(dx < 0 ? 1 : -1); else if (dy > 90) closeDView(); });
 if (finePointer) {
   catGrid.addEventListener('pointerover', e => {
     const c = e.target.closest('.card'); if (!c || c.querySelector('video')) return;
@@ -773,7 +842,7 @@ async function initScene() {
   const railBtns = $$('#rail button'), caps = $$('.chap .cap');
   // pointer: parallax, hover, click
   const mouse = { x: 0, y: 0, tx: 0, ty: 0, px: -1, py: -1, has: false };
-  const UI = 'a,button,input,select,label,textarea,.glass,.cap,dialog,.nav,.ct,.hero-in,.rail,.vw-bar,.vw-info,.vw-x,#home,#catalog';
+  const UI = 'a,button,input,select,label,textarea,.glass,.cap,dialog,.nav,.ct,.hero-in,.rail,.vw-bar,.vw-info,.vw-x,#home,#catalog,#dview';
   const hov = document.createElement('div'); hov.className = 'hov'; document.body.append(hov);
   addEventListener('pointermove', e => {
     if (e.pointerType === 'mouse') { mouse.tx = e.clientX / innerWidth * 2 - 1; mouse.ty = e.clientY / innerHeight * 2 - 1; }

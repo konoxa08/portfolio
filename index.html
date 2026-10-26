@@ -149,6 +149,20 @@
   </div>
 </div>
 
+<div id="dview" aria-hidden="true">
+  <div class="dv-stage" id="dv-stage"><video id="dvv" playsinline preload="auto"></video></div>
+  <div class="vw-info dv-info"><p class="vw-n dv-n"></p><p class="vw-k dv-k"></p><h2 class="dv-t"></h2><p class="vw-d dv-d"></p><p class="vw-tip">← → гортати · Esc закрити</p></div>
+  <div class="vw-bar">
+    <button type="button" class="dv-prev" aria-label="Попередній ролик"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button type="button" class="vw-play dv-play" aria-label="Пауза / відтворення" aria-pressed="true"><svg class="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg><svg class="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg></button>
+    <div class="vw-track dv-track"><i class="dv-fill"></i></div>
+    <span class="vw-time dv-time">0:00</span>
+    <button type="button" class="dv-snd" id="dvsnd" aria-label="Звук" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path class="w" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+    <button type="button" class="dv-next" aria-label="Наступний ролик"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <button type="button" class="vw-x dv-x">Закрити <kbd>Esc</kbd></button>
+</div>
+
 <div id="viewer" aria-live="polite">
   <div class="vw-info">
     <p class="vw-n" id="vn"></p>
