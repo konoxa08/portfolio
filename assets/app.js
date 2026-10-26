@@ -16,8 +16,32 @@ const BN = Object.fromEntries(data.briefNiches.map(n => [n.id, n]));
 
 /* ---------------- scroll ---------------- */
 // native scrolling; the camera itself is damped, so motion stays smooth
-const lenis = null;
-const lockScroll = on => { document.documentElement.style.overflow = on ? 'hidden' : ''; };
+// light smooth-wheel; falls back to native scrolling if the page can't move itself
+const SS = { on: matchMedia('(pointer: fine)').matches && !reduced, tgt: 0, cur: 0, run: false, ok: false };
+const ssStep = () => {
+  SS.cur += (SS.tgt - SS.cur) * .1;
+  if (Math.abs(SS.tgt - SS.cur) < .5) { SS.cur = SS.tgt; SS.run = false; }
+  scrollTo(0, SS.cur);
+  if (SS.run) requestAnimationFrame(ssStep);
+};
+addEventListener('wheel', e => {
+  if (!SS.on || e.ctrlKey || document.documentElement.style.overflow === 'hidden') return;
+  if (e.target.closest && e.target.closest('.cat-in,dialog,select,textarea,.nlist')) return;
+  e.preventDefault();
+  const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY;
+  if (!SS.run) { SS.tgt = SS.cur = scrollY; }
+  const max = document.documentElement.scrollHeight - innerHeight;
+  SS.tgt = clamp(SS.tgt + dy * 1.1, 0, max);
+  if (!SS.run) { SS.run = true; requestAnimationFrame(ssStep); }
+  if (!SS.ok) {
+    const y0 = scrollY, want = SS.tgt;
+    setTimeout(() => {
+      if (Math.abs(scrollY - y0) < 1 && Math.abs(want - y0) > 4) { SS.on = false; SS.run = false; scrollBy(0, want - y0); }
+      else SS.ok = true;
+    }, 220);
+  }
+}, { passive: false });
+const lockScroll = on => { SS.run = false; document.documentElement.style.overflow = on ? 'hidden' : ''; };
 // jump with a cinematic camera flight instead of scrolling through every section
 const W = { t0: -1e9, dur: 1500 };
 function go(el) {
@@ -26,7 +50,7 @@ function go(el) {
   if (Math.abs(y - scrollY) < 4) return;
   document.body.classList.add('warping');
   W.pending = () => {
-    scrollTo({ top: y, behavior: 'instant' });
+    SS.run = false; scrollTo({ top: y, behavior: 'instant' });
     W.t0 = performance.now();
     setTimeout(() => document.body.classList.remove('warping'), 60);
   };
@@ -397,12 +421,36 @@ async function initScene() {
   fl2.rotation.x = -Math.PI / 2; fl2.position.y = .002; s.add(fl2);
 
   // wall + slats
+  const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
   const wall = new THREE.Mesh(new THREE.PlaneGeometry(44, 14), new THREE.MeshStandardMaterial({ color: 0x07090f, roughness: .9 }));
   wall.position.set(0.6, 6, -4.2); s.add(wall);
   const NS = 85, slats = new THREE.InstancedMesh(new THREE.BoxGeometry(.11, 9, .12), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: .55, metalness: .1 }), NS);
   const m4 = new THREE.Matrix4();
   for (let i = 0; i < NS; i++) { m4.makeTranslation(0.6 + (i - NS / 2) * .26, 4.5, -4.05); slats.setMatrixAt(i, m4); }
   s.add(slats);
+  // LED strips between the slats: a slow wave of light runs across the wall
+  const leds = new THREE.InstancedMesh(new THREE.BoxGeometry(.02, 8.6, .02), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, transparent: true }), NS - 1);
+  for (let i = 0; i < NS - 1; i++) { m4.makeTranslation(0.6 + (i - NS / 2 + 1) * .26 - .13, 4.5, -3.985); leds.setMatrixAt(i, m4); leds.setColorAt(i, new THREE.Color(0)); }
+  s.add(leds);
+  const ledC = new THREE.Color();
+  // comet light trail weaving through the studio
+  const trailCurve = new THREE.CatmullRomCurve3([
+    V3(-6.4, 1.3, 3.4), V3(-4.2, 2.9, .4), V3(-1.6, 3.7, -1.6), V3(.6, 4.7, -2.1), V3(2.9, 3.5, -1.4),
+    V3(5.3, 2.5, .6), V3(7.1, 1.7, 3.3), V3(4.2, .7, 3.9), V3(.6, 1.0, 2.3), V3(-3.1, .55, 4.1)], true, 'centripetal');
+  const trailM = new THREE.ShaderMaterial({
+    uniforms: { t: { value: 0 }, col: { value: new THREE.Color(0x3fd6ff) }, op: { value: 1 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+    vertexShader: 'varying float vU; void main(){ vU = uv.x; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float t; uniform vec3 col; uniform float op; varying float vU;
+      float comet(float d){ return exp(-d * 7.0) * smoothstep(0.0, 0.004, d); }
+      void main(){
+        float d1 = fract(t - vU), d2 = fract(t + 0.5 - vU);
+        float a = comet(d1) + 0.7 * comet(d2) + 0.035;
+        float head = exp(-d1 * 140.0) + 0.7 * exp(-d2 * 140.0);
+        gl_FragColor = vec4(col * (1.2 + 5.0 * head), a * op);
+      }`,
+  });
+  const trail = new THREE.Mesh(new THREE.TubeGeometry(trailCurve, 700, .016, 6, true), trailM); s.add(trail);
   const NEONS = [];
   const neon = (w, h, col, k, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, .04), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(k) })); m.position.set(x, y, z); s.add(m); m.userData = { base: new THREE.Color(col), k }; NEONS.push(m); return m; };
   neon(7, .03, 0x3fd6ff, 2.4, 0.6, 5.4, -3.9);
@@ -815,6 +863,12 @@ async function initScene() {
     if (monV.material.map !== mm) { monV.material.map = mm; monV.material.needsUpdate = true; }
     glow.material.opacity = .14 + (kind === 'brief' ? .1 : 0);
     if (!reduced) dust.rotation.y = now / 90000;
+    trailM.uniforms.t.value = reduced ? .3 : now / 16000; trailM.uniforms.col.value.copy(amb); trailM.uniforms.op.value = (1 - focusAmt * .8) * (1 - orb * .7);
+    for (let i = 0; i < NS - 1; i++) {
+      const x = i / (NS - 1), w = Math.pow(Math.max(0, Math.sin(x * 9 - now / 900)), 10) + .6 * Math.pow(Math.max(0, Math.sin(x * 5 + now / 1500 + 1.3)), 14);
+      ledC.copy(amb).multiplyScalar((.05 + w * 1.6) * ro); leds.setColorAt(i, ledC);
+    }
+    leds.instanceColor.needsUpdate = true; leds.visible = ro > .01;
 
     if (FOCUS.id) {
       const d = vid.duration || 0;
