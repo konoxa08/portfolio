@@ -17,12 +17,13 @@ const BN = Object.fromEntries(data.briefNiches.map(n => [n.id, n]));
 /* ---------------- scroll ---------------- */
 // native scrolling; the camera itself is damped, so motion stays smooth
 // light smooth-wheel; falls back to native scrolling if the page can't move itself
-const SS = { on: false, can: matchMedia('(pointer: fine)').matches && !reduced, tgt: 0, cur: 0, run: false, ok: false };
+const SS = { on: matchMedia('(pointer: fine)').matches && !reduced, can: matchMedia('(pointer: fine)').matches && !reduced, tgt: 0, cur: 0, run: false, ok: false };
 const ssStep = () => {
-  SS.cur += (SS.tgt - SS.cur) * .1;
+  const now = performance.now(), dt = Math.min(.05, (now - (SS.last || now)) / 1000 || .016); SS.last = now;
+  SS.cur += (SS.tgt - SS.cur) * (1 - Math.exp(-dt * 7));
   if (Math.abs(SS.tgt - SS.cur) < .5) { SS.cur = SS.tgt; SS.run = false; }
   scrollTo(0, SS.cur);
-  if (SS.run) requestAnimationFrame(ssStep);
+  if (SS.run) requestAnimationFrame(ssStep); else SS.last = 0;
 };
 addEventListener('wheel', e => {
   if (!SS.on || e.ctrlKey || document.documentElement.style.overflow === 'hidden') return;
@@ -778,7 +779,7 @@ async function initScene() {
       if (ft.length === 45) {
         const avg = ft.reduce((a, b) => a + b, 0) / 45;
         if (avg > .024 && !degraded) { degrade(); ft.length = 0; }
-        SS.on = SS.can && avg < .021; // smooth wheel only when frames are fast
+
       }
     }
     const st = target();
@@ -846,7 +847,7 @@ async function initScene() {
       const m = on && vReady ? vtex : sc.poster;
       if (sc.scr.material.map !== m) { sc.scr.material.map = m; sc.scr.material.needsUpdate = true; }
       sc.ft = clamp(sc.ft + (FOCUS.id === id ? 1 : -1) * dt / (reduced ? .01 : .85));
-      const want = FOCUS.id ? (FOCUS.id === id ? 1 : .15) : kind === 'niche' ? (curNiche === 'insha' ? .55 : byId[id].niche === curNiche ? 1 : .16) : on ? 1 : kind === 'work' ? .45 : 1;
+      const want = FOCUS.id ? (FOCUS.id === id ? 1 : .15) : kind === 'why' ? .55 : kind === 'niche' ? (curNiche === 'insha' ? .55 : byId[id].niche === curNiche ? 1 : .16) : on ? 1 : kind === 'work' ? .45 : 1;
       sc.lvl += (want - sc.lvl) * Math.min(1, dt * 5);
       const c = sc.lvl * (on ? 1 : sc.dim);
       sc.scr.material.color.setRGB(c, c, c);
