@@ -14,17 +14,10 @@ const FEAT = data.featured.map(id => byId[id]).filter(Boolean);
 const ORDER = [...FEAT, ...WORKS.filter(w => !FEAT.includes(w))];
 const BN = Object.fromEntries(data.briefNiches.map(n => [n.id, n]));
 
-/* ---------------- smooth scroll ---------------- */
-let lenis = null;
-if (window.Lenis && !reduced) {
-  lenis = new window.Lenis({ lerp: .085, wheelMultiplier: .9, smoothWheel: true });
-  const raf = t => { lenis.raf(t); requestAnimationFrame(raf); };
-  requestAnimationFrame(raf);
-}
-const lockScroll = on => {
-  if (lenis) on ? lenis.stop() : lenis.start();
-  document.documentElement.style.overflow = on ? 'hidden' : '';
-};
+/* ---------------- scroll ---------------- */
+// native scrolling; the camera itself is damped, so motion stays smooth
+const lenis = null;
+const lockScroll = on => { document.documentElement.style.overflow = on ? 'hidden' : ''; };
 // jump with a cinematic camera flight instead of scrolling through every section
 const W = { t0: -1e9, dur: 1500 };
 function go(el) {
@@ -33,7 +26,7 @@ function go(el) {
   if (Math.abs(y - scrollY) < 4) return;
   document.body.classList.add('warping');
   W.pending = () => {
-    if (lenis) lenis.scrollTo(y, { immediate: true, force: true }); else scrollTo(0, y);
+    scrollTo({ top: y, behavior: 'instant' });
     W.t0 = performance.now();
     setTimeout(() => document.body.classList.remove('warping'), 60);
   };
