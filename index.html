@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Темна студія</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Моушн-реклама для бізнесу у форматі Reels 9:16: нерухомість, wellness, товари, fashion.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..900&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<canvas id="gl" aria-hidden="true"></canvas>
+<div class="scrim" aria-hidden="true"></div>
+
+<div id="loader" role="status">
+  <div class="ld-mark"></div>
+  <p class="ld-txt">Вмикаю світло в студії</p>
+  <div class="ld-bar"><i id="ld-fill"></i></div>
+</div>
+
+<header class="nav">
+  <a class="logo" href="#hero"><i></i><span data-c="name">ВАШЕ ІМ'Я</span></a>
+  <nav class="links" aria-label="Розділи">
+    <a href="#works">Роботи</a><a href="#niches">Ніші</a><a href="#brief">Бриф</a><a href="#contact">Контакти</a>
+  </nav>
+  <div class="nav-r">
+    <button id="snd" class="snd" type="button" aria-pressed="false" title="Звук роликів">
+      <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="snd-l">Звук</span>
+    </button>
+    <a class="cta" href="#brief">Замовити ролик</a>
+  </div>
+</header>
+
+<ol class="rail" id="rail" aria-label="Роботи"></ol>
+
+<main>
+  <section id="hero" class="sec hero">
+    <div class="hero-in">
+      <p class="tag">Motion design · Reels 9:16</p>
+      <h1>Реклама,<br><span class="grad">яка рухається.</span></h1>
+      <p class="sub">Моушн-ролики для бізнесу: нерухомість, wellness, товари, fashion. Від сценарію до готового відео зі звуком.</p>
+      <div class="btns">
+        <a class="b1" href="#works">Дивитись роботи</a>
+        <a class="b2" data-c="tg-link" href="#contact" target="_blank" rel="noopener">Telegram</a>
+      </div>
+    </div>
+    <p class="strip"><b id="count">10</b> робіт · <span id="strip-n"></span></p>
+  </section>
+
+  <section id="works" aria-label="Обрані роботи"></section>
+
+  <section id="niches" class="sec">
+    <div class="glass pnl">
+      <p class="k">Приміряйте на свій бізнес</p>
+      <h2>Яка у вас ніша?</h2>
+      <div class="chips" id="nchips" role="tablist" aria-label="Ніші"></div>
+      <p class="hint" id="nhint"></p>
+      <ul class="nlist" id="nlist"></ul>
+    </div>
+  </section>
+
+  <section id="brief" class="sec">
+    <form class="glass pnl" id="bform" autocomplete="off">
+      <p class="k">Бриф · 3 питання</p>
+      <h2>Ваш ролик за 3 відповіді</h2>
+      <label class="fld"><span>1 · Ніша</span><select id="b-niche"></select></label>
+      <label class="fld"><span>2 · Назва</span><input id="b-name" maxlength="28" placeholder="Ваша кав'ярня"></label>
+      <fieldset class="fld"><legend>3 · Стиль</legend>
+        <div class="seg" id="b-style">
+          <label><input type="radio" name="st" value="trail" checked><span>Світловий слід</span></label>
+          <label><input type="radio" name="st" value="glass"><span>Скло і світло</span></label>
+          <label><input type="radio" name="st" value="kinetic"><span>Неоновий кінетик</span></label>
+        </div>
+      </fieldset>
+      <div class="btns">
+        <button class="b1" id="b-send" type="submit">Замовити такий ролик</button>
+      </div>
+      <p class="gen"><i></i>Прев'ю на моніторі оновлюється одразу</p>
+    </form>
+  </section>
+
+  <section id="contact" class="sec">
+    <div class="ct">
+      <p class="tag">Контакти</p>
+      <h2>Обговоримо<br>ваш ролик?</h2>
+      <p class="sub">Напишіть нішу і що хочете показати. Відповім зі сценарієм і термінами.</p>
+      <ul class="crow">
+        <li><span>Telegram</span><a data-c="tg-link" data-t="telegram" target="_blank" rel="noopener" href="#"></a><button type="button" class="cp" data-copy="telegram">Копіювати</button></li>
+        <li><span>Instagram</span><a data-c="ig-link" data-t="instagram" target="_blank" rel="noopener" href="#"></a><button type="button" class="cp" data-copy="instagram">Копіювати</button></li>
+        <li><span>Телефон</span><b data-t="phone"></b><button type="button" class="cp" data-copy="phone">Копіювати</button></li>
+      </ul>
+      <p class="foot">© 2026 <span data-c="name">ВАШЕ ІМ'Я</span> · Моушн-реклама 9:16</p>
+    </div>
+  </section>
+</main>
+
+<dialog id="player" aria-label="Перегляд ролика">
+  <div class="pl-in">
+    <video id="pv" controls playsinline preload="none"></video>
+    <div class="pl-cap"><b id="pt"></b><span id="ps"></span></div>
+    <button type="button" class="pl-x" id="px" aria-label="Закрити">×</button>
+  </div>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module" src="assets/app.js"></script>
+</body>
+</html>
