@@ -744,7 +744,8 @@ async function initScene() {
   });
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   const picks = Object.values(screens).map(sc => sc.scr); monV.userData.id = null; picks.push(monV, monBg);
-  let hoverId = null;
+  let hoverId = null, curKind = 'hero';
+  const calm = () => curKind === 'why' || curKind === 'proc'; // no video opening inside «Чому я»
   function pick(list = picks) {
     if (!mouse.has || mouse.px < 0) return null;
     ndc.set(mouse.px / innerWidth * 2 - 1, -(mouse.py / innerHeight) * 2 + 1);
@@ -756,7 +757,7 @@ async function initScene() {
     if (e.target.closest(UI)) return;
     mouse.px = e.clientX; mouse.py = e.clientY; mouse.has = true;
     if (FOCUS.id) { if (pick([screens[FOCUS.id].scr])) vw.play.click(); else closeViewer(); return; }
-    const id = pick();
+    const id = pick(calm() ? [monV, monBg] : picks);
     if (id === '__why') { const el = $('#why .why-intro'); tweenScroll(el.getBoundingClientRect().top + scrollY - innerHeight * .28, 1900); return; }
     if (id) openViewer(id);
   });
@@ -842,7 +843,7 @@ async function initScene() {
     else if (kind === 'hero' || kind === 'contact') { vidFor = FEAT[0].id; vidTarget = monV; }
     if (vidFor) wantVideo(vidFor); vidFor0 = vidFor;
     monV.userData.id = monBg.userData.id = kind === 'why' && tp < .2 ? '__why' : kind === 'brief' || kind === 'why' || kind === 'proc' ? null : (vidFor0 || FEAT[0].id);
-    hoverId = FOCUS.id ? null : pick();
+    curKind = kind; hoverId = FOCUS.id ? null : pick(calm() ? [monV, monBg] : picks);
     document.body.classList.toggle('pick', !!hoverId || (!!FOCUS.id && !!pick([screens[FOCUS.id].scr])));
     if (hoverId) { hov.textContent = hoverId === '__why' ? 'Натисніть, щоб дізнатися більше ↓' : byId[hoverId].title; hov.style.transform = `translate(${mouse.px + 16}px,${mouse.py + 18}px)`; hov.classList.add('on'); }
     else hov.classList.remove('on');
